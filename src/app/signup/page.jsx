@@ -77,7 +77,7 @@ export default function SignUp() {
       <Card className="w-full max-w-md shadow-2xl relative z-10">
         <CardHeader className="space-y-1 pb-6">
           <div className="flex items-center justify-center">
-            <Package className="h-12 w-12 text-indigo-600 dark:text-indigo-400" />
+            <Link href="/"><Package className="h-12 w-12 text-indigo-600 dark:text-indigo-400" /></Link> 
           </div>
           <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">Create your account</CardTitle>
         </CardHeader>

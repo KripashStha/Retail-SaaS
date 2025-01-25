@@ -11,7 +11,7 @@ const benefits = [
 
 export default function Benefits() {
   return (
-    <div id="benefits" className="py-8 sm:py-10 md:py-12 lg:py-16 bg-gray-50 dark:bg-gray-800">
+    <div id="benefits" className="py-8 sm:py-10 md:py-12 lg:py-20 bg-gray-50 dark:bg-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="lg:text-center">
           <h2 className="text-base text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide uppercase">Benefits</h2>
@@ -26,7 +26,7 @@ export default function Benefits() {
         <div className="mt-10">
           <ul className="md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
             {benefits.map((benefit) => (
-              <li key={benefit} className="mt-10 first:mt-0 md:mt-0">
+              <li key={benefit} className="mt-10 first:mt-0 md:mt-0 ml-28">
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <CheckCircle className="h-6 w-6 text-green-500" aria-hidden="true" />
