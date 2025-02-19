@@ -26,7 +26,7 @@ export default function Benefits() {
         <div className="mt-10">
           <ul className="md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
             {benefits.map((benefit) => (
-              <li key={benefit} className="mt-10 first:mt-0 md:mt-0 ml-28">
+              <li key={benefit} className="mt-10 first:mt-0 md:mt-0 md:ml-28">
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <CheckCircle className="h-6 w-6 text-green-500" aria-hidden="true" />

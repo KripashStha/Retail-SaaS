@@ -1,6 +1,6 @@
 export default function CTA() {
     return (
-      <section className="py-16 sm:py-20 bg-grey-50 dark:bg-gray-900">
+      <section className="py-16 sm:py-20 bg-grey-50 dark:bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             Experience the simplest inventory

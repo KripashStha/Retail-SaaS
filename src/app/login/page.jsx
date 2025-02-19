@@ -11,34 +11,116 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Checkbox } from "@/components/ui/checkbox"
 import GoogleOauth from "@/components/GoogleOauth";
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useToast } from "@/hooks/use-toast"
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      const user = auth.currentUser;
+    if(validateForm()) {
+      setIsLoading(true);
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        const user = auth.currentUser;
 
-      if(!user.emailVerified){
-        alert("Please verify your email to proceed.");
-        // Redirect to a "Verify Email" page
-        return;
-  
+        if(!user.emailVerified){
+          toast({
+            variant: "destructive",
+            title: "Email Not Verified",
+            description: "Please verify your email to proceed. Check your inbox for the verification link.",
+          });
+          return;
+        }
+
+        toast({
+          title: "Success",
+          description: "Successfully logged in",
+        });
+        router.push("/admin");
+      } catch (error) {
+        console.error("Login failed", error.message);
+        let errorMessage = "";
+        
+        // Handle specific Firebase auth errors
+        switch (error.code) {
+          case 'auth/user-not-found':
+            setErrors({ email: 'No account found with this email' });
+            errorMessage = 'No account found with this email';
+            break;
+          case 'auth/wrong-password':
+            setErrors({ password: 'Incorrect password' });
+            errorMessage = 'Incorrect password';
+            break;
+          case 'auth/invalid-email':
+            setErrors({ email: 'Invalid email format' });
+            errorMessage = 'Invalid email format';
+            break;
+          case 'auth/user-disabled':
+            errorMessage = 'This account has been disabled';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later';
+            break;
+          default:
+            errorMessage = 'Failed to login. Please try again';
+        }
+
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: errorMessage,
+        });
+      } finally {
+        setIsLoading(false);
       }
-
-      console.log("User logged in successfully");
-    } catch (error) {
-      console.log("Login failed", error.message);
     }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (field, value) => {
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+
+    // Update field value
+    if (field === 'email') setEmail(value);
+    if (field === 'password') setPassword(value);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-gray-900 dark:to-indigo-900 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background package logos */}
       <div className="absolute inset-0 z-0 opacity-10">
         <Package className="absolute top-1/4 left-1/4 h-16 w-16 text-indigo-600 dark:text-indigo-400 transform -rotate-12" />
         <Package className="absolute top-3/4 left-1/3 h-24 w-24 text-purple-600 dark:text-purple-400 transform rotate-45" />
@@ -47,15 +129,25 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-2xl relative z-10">
         <CardHeader className="space-y-1 pb-6">
           <div className="flex items-center justify-center">
-          <Link href="/"><Package className="h-12 w-12 text-indigo-600 dark:text-indigo-400" /></Link> 
+            <Link href="/"><Package className="h-12 w-12 text-indigo-600 dark:text-indigo-400" /></Link> 
           </div>
           <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">Sign in to your account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email"  onChange={(e) => setEmail(e.target.value)}
-              type="email" placeholder="john@example.com" required />
+            <Input 
+              id="email"  
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              type="email" 
+              placeholder="john@example.com" 
+              required 
+              className={`${errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'}`}
+              disabled={isLoading}
+            />
+            {errors.email && 
+              <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+            }
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -63,14 +155,20 @@ export default function Login() {
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => handleInputChange('password', e.target.value)}
                 placeholder="••••••••"
                 required
+                className={`${errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'}`}
+                disabled={isLoading}
               />
+              {errors.password && 
+                <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              }
               <button
                 type="button"
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -82,17 +180,25 @@ export default function Login() {
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Checkbox id="remember" />
+              <Checkbox id="remember" disabled={isLoading} />
               <Label htmlFor="remember" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Remember me
               </Label>
             </div>
-            <Link href="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+            <Link 
+              href="/forgot-password" 
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
               Forgot password?
             </Link>
           </div>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" 
-            onClick={handleLogin}>Sign In</Button>
+          <Button 
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+            onClick={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? "Signing in..." : "Sign In"}
+          </Button>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <div className="relative">
@@ -103,16 +209,15 @@ export default function Login() {
               <span className="bg-white dark:bg-gray-800 px-2 text-gray-500 dark:text-gray-400">Or continue with</span>
             </div>
           </div>
-          < GoogleOauth />
+          <GoogleOauth />
+          <p className="pt-3 text-center text-sm text-gray-600 dark:text-gray-400">
+            Don't have an account?{' '}
+            <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+              Sign up
+            </Link>
+          </p>
         </CardFooter>
       </Card>
-      <p className="absolute bottom-40 text-center text-sm text-gray-600 dark:text-gray-400">
-        Don't have an account?{' '}
-        <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-          Sign up
-        </Link>
-      </p>
     </div>
-  )
+  );
 }
-

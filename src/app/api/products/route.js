@@ -33,7 +33,7 @@ export async function POST(request) {
     const body = await request.json();
     console.log('POST request body:', body);
 
-    const { name, price, quantity, description = '' } = body;
+    const { name, price, quantity, threshold = '' } = body;
 
     // Validate inputs
     if (!name?.trim()) {
@@ -54,7 +54,7 @@ export async function POST(request) {
         name: name.trim(),
         price: parseFloat(price),
         quantity: parseInt(quantity, 10),
-        description: description.trim(),
+        threshold: parseInt(threshold, 10),
         createdAt: new Date().toISOString()
       });
 
@@ -63,7 +63,7 @@ export async function POST(request) {
         name,
         price: parseFloat(price),
         quantity: parseInt(quantity, 10),
-        description
+        threshold: parseInt(threshold, 10)
       }, { status: 201 });
 
     } catch (dbError) {
@@ -104,16 +104,16 @@ export async function PUT(request) {
     const body = await request.json();
     console.log('PUT request body:', body); // Add logging
 
-    const { id, name, price, quantity, description = '' } = body;
+    const { id, name, price, quantity, threshold = '' } = body;
 
     if (!id || !name || !price || !quantity) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const productRef = doc(db, 'products', id);
-    await updateDoc(productRef, { name, price: parseFloat(price), quantity: parseInt(quantity, 10), description });
+    await updateDoc(productRef, { name, price: parseFloat(price), quantity: parseInt(quantity, 10), threshold: parseInt(threshold, 10) });
 
-    return NextResponse.json({ id, name, price, quantity, description }, { status: 200 });
+    return NextResponse.json({ id, name, price, quantity, threshold }, { status: 200 });
   } catch (error) {
     console.error('Error updating product:', error);
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
