@@ -229,9 +229,9 @@ export default function Employee() {
   const getStatusBadge = (status) => {
     switch (status) {
       case "pending_invite":
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge variant="secondary" className="text-red-500 bg-red-50">Pending</Badge>;
       case "active":
-        return <Badge variant="success">Active</Badge>;
+        return <Badge variant="success" className="text-green-500 bg-green-50">Accepted</Badge>;
       case "expired":
         return <Badge variant="warning">Expired</Badge>;
       default:

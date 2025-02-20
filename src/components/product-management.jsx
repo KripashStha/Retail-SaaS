@@ -22,12 +22,37 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { 
+  Plus, 
+  Pencil, 
+  Trash2, 
+  AlertTriangle, 
+  Loader2,
+  Tag,
+  Filter
+} from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+// Import Firebase auth and db
+import { auth, db } from "@/firebase/dbConfig";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 export function InventoryTracking() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -42,21 +67,63 @@ export function InventoryTracking() {
     quantity: 0,
     price: 0,
     threshold: 0,
+    category: "",
+    barcode: "",
   });
   const [bulkEntryData, setBulkEntryData] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  // Add state for current business
+  const [currentBusiness, setCurrentBusiness] = useState(null);
+  const { toast } = useToast();
 
   const itemsPerPage = 5;
 
-  // Fetch products from API
+  // Fetch business ID
+  const fetchBusinessId = async () => {
+    try {
+      // Get current user's business ID
+      const userDoc = await getDocs(
+        query(
+          collection(db, "Users"),
+          where("email", "==", auth.currentUser.email)
+        )
+      );
+      if (userDoc.empty) {
+        console.error("No user document found");
+        setError("User not found. Please check authentication.");
+        return null;
+      }
+
+      const businessId = userDoc.docs[0].data().businessId;
+      setCurrentBusiness(businessId);
+      return businessId;
+    } catch (err) {
+      console.error("Error fetching business ID:", err.message);
+      setError(`Error loading business data: ${err.message}`);
+      return null;
+    }
+  };
+
+  // Updated fetch products to include businessId
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/products');
+      
+      // Ensure we have a business ID
+      const businessId = currentBusiness || await fetchBusinessId();
+      if (!businessId) {
+        throw new Error('Business ID not available');
+      }
+      
+      const response = await fetch(`/api/products?businessId=${businessId}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       const data = await response.json();
       setProducts(data);
+      
       setError(null);
     } catch (err) {
       setError(`Error loading products: ${err.message}`);
@@ -64,12 +131,28 @@ export function InventoryTracking() {
       setLoading(false);
     }
   };
-
+  
   useEffect(() => {
-    fetchProducts();
+    const initialize = async () => {
+      if (auth.currentUser) {
+        await fetchBusinessId();
+        await fetchCategories();
+        await fetchProducts();
+      } else {
+        setError("User not authenticated");
+        setLoading(false);
+      }
+    };
+    
+    initialize();
   }, []);
+  
 
   const createProduct = async (productData) => {
+    if (!currentBusiness) {
+      throw new Error('Business ID not available');
+    }
+    
     const response = await fetch('/api/products', {
       method: 'POST',
       headers: {
@@ -77,27 +160,44 @@ export function InventoryTracking() {
       },
       body: JSON.stringify({
         ...productData,
+        businessId: currentBusiness,
         price: parseFloat(productData.price),
         quantity: parseInt(productData.quantity),
         threshold: parseInt(productData.threshold)
       }),
     });
     
+    const result = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create product');
+      throw new Error(result.error || 'Failed to create product');
     }
-    return response.json();
+    
+    // Re-fetch categories to include the new category
+    await fetchCategories(); // Call this to refresh categories
+
+    toast({
+      title: "Success",
+      description: "Product added successfully",
+      variant: "success",
+    });
+    
+    return result;
   };
   
   const updateProduct = async (id, updateData) => {
-    const response = await fetch(`/api/products/${id}`, {
+    if (!currentBusiness) {
+      throw new Error('Business ID not available');
+    }
+    
+    const response = await fetch(`/api/products`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         id,
+        businessId: currentBusiness,
         ...updateData,
         price: parseFloat(updateData.price),
         quantity: parseInt(updateData.quantity),
@@ -105,32 +205,133 @@ export function InventoryTracking() {
       }),
     });
     
+    const result = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update product');
+      throw new Error(result.error || 'Failed to update product');
     }
-    return response.json();
+    
+    toast({
+      title: "Success",
+      description: "Product updated successfully",
+      variant: "success",
+    });
+    
+    return result;
   };
   
   const deleteProduct = async (id) => {
-    const response = await fetch(`/api/products/${id}`, {
+    if (!currentBusiness) {
+      throw new Error('Business ID not available');
+    }
+    
+    const response = await fetch(`/api/products`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, businessId: currentBusiness }),
     });
     
+    const result = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to delete product');
+      throw new Error(result.error || 'Failed to delete product');
     }
-    return response.json();
+    
+    toast({
+      title: "Success",
+      description: "Product deleted successfully",
+      variant: "success",
+    });
+    
+    return result;
   };
 
+  // Updated fetchCategories to include businessId
+  const fetchCategories = async () => {
+    try {
+      // Ensure we have a business ID
+      const businessId = currentBusiness || await fetchBusinessId();
+      if (!businessId) {
+        throw new Error('Business ID not available');
+      }
+      
+      const response = await fetch(`/api/categories?businessId=${businessId}`);
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json();
+      setCategories(data.map(category => category.name));
+    } catch (err) {
+      console.error('Error loading categories:', err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
+ 
+  // Updated addCategory to include businessId
+  const addCategory = async () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      try {
+        if (!currentBusiness) {
+          throw new Error('Business ID not available');
+        }
+        
+        setActionLoading({ id: 'category', type: 'add' });
+        
+        const response = await fetch('/api/categories', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            name: newCategory.trim(),
+            businessId: currentBusiness
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to add category');
+        }
+        
+        await fetchCategories(); // Refresh categories from the server
+        setNewCategory("");
+        setIsCategoryDialogOpen(false);
+        
+        toast({
+          title: "Success",
+          description: "Category added successfully",
+          variant: "success",
+        });
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: err.message,
+          variant: "destructive",
+        });
+      } finally {
+        setActionLoading({ id: null, type: null });
+      }
+    }else{
+      toast({
+        title: "Error",
+        description: "Category name already exists",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Updated filtering logic to include category filter
   const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) 
+    (product) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    }
   );
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -139,6 +340,11 @@ export function InventoryTracking() {
     indexOfFirstItem,
     indexOfLastItem
   );
+
+  // Reset to first page when changing filters
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory]);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
@@ -163,16 +369,35 @@ export function InventoryTracking() {
     }
   };
 
+  const handleSelectChange = (value) => {
+    if (editingProduct) {
+      setEditingProduct({
+        ...editingProduct,
+        category: value
+      });
+    } else {
+      setNewProduct({
+        ...newProduct,
+        category: value
+      });
+    }
+  };
+
   const handleAddProduct = async () => {
     setActionLoading({ id: 'new', type: 'add' });
     try {
       await createProduct(newProduct);
       await fetchProducts();
-      setNewProduct({ name: "", quantity: 0, price: 0, threshold: 0 });
+      setNewProduct({ name: "", quantity: 0, price: 0, threshold: 0, category: "", barcode: "" });
       setIsDialogOpen(false);
       setError(null);
     } catch (err) {
       setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
       setActionLoading({ id: null, type: null });
     }
@@ -184,11 +409,16 @@ export function InventoryTracking() {
       try {
         await updateProduct(editingProduct.id, editingProduct);
         await fetchProducts();
-        setEditingProduct(null);
         setIsEditDialogOpen(false);
+        setEditingProduct(null);
         setError(null);
       } catch (err) {
         setError(err.message);
+        toast({
+          title: "Error",
+          description: err.message,
+          variant: "destructive",
+        });
       } finally {
         setActionLoading({ id: null, type: null });
       }
@@ -205,6 +435,11 @@ export function InventoryTracking() {
       setError(null);
     } catch (err) {
       setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
       setActionLoading({ id: null, type: null });
     }
@@ -212,14 +447,21 @@ export function InventoryTracking() {
 
   const handleBulkEntry = async () => {
     try {
+      if (!currentBusiness) {
+        throw new Error('Business ID not available');
+      }
+      
       setActionLoading({ id: 'bulk', type: 'add' });
       const newProducts = bulkEntryData.split("\n").map((line) => {
-        const [name, quantity, price, threshold] = line.split(",");
+        const [name, quantity, price, threshold, category, barcode] = line.split(",");
         return {
           name: name.trim(),
           quantity: parseInt(quantity.trim()),
           price: parseFloat(price.trim()),
           threshold: parseInt(threshold.trim()),
+          category: category?.trim() || "",
+          barcode: barcode?.trim() || "",
+          businessId: currentBusiness
         };
       });
 
@@ -243,8 +485,19 @@ export function InventoryTracking() {
       await fetchProducts();
       setBulkEntryData("");
       setError(null);
+      
+      toast({
+        title: "Success",
+        description: `${validProducts.length} products imported successfully`,
+        variant: "success",
+      });
     } catch (err) {
       setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
       setActionLoading({ id: null, type: null });
     }
@@ -272,14 +525,63 @@ export function InventoryTracking() {
           </Alert>
         )}
         
-        <div className="mb-4 flex justify-between items-center">
-          <Input
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
-          <div className="space-x-2">
+        <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <div className="relative flex-1">
+              <Input
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pr-8"
+              />
+            </div>
+            
+            {/* Category Filter with Add Category Button */}
+            <div className="flex-shrink-0 w-full sm:w-auto flex gap-2">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-48">
+                  <div className="flex items-center">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Filter by category" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Add Category Button - Moved here */}
+              <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" className="flex-shrink-0">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-xs">
+                  <DialogHeader>
+                    <DialogTitle>Add New Category</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Input
+                      placeholder="Category name"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={addCategory}>
+                      Add Category
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2 w-full md:w-auto justify-end">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-indigo-600 text-white">
@@ -308,18 +610,40 @@ export function InventoryTracking() {
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="quantity" className="text-right">
+                    <Label htmlFor="barcode" className="text-right">
                       Barcode
                     </Label>
                     <Input
-                      id="quantity"
-                      name="quantity"
-                      type="number"
+                      id="barcode"
+                      name="barcode"
                       value={newProduct.barcode}
                       onChange={handleInputChange}
                       className="col-span-3"
                       disabled={actionLoading.id === 'new'}
                     />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="category" className="text-right">
+                      Category
+                    </Label>
+                    <div className="col-span-3">
+                      <Select 
+                        value={newProduct.category} 
+                        onValueChange={handleSelectChange}
+                        disabled={actionLoading.id === 'new'}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="quantity" className="text-right">
@@ -386,13 +710,13 @@ export function InventoryTracking() {
                 <DialogHeader>
                   <DialogTitle>Bulk Import Products</DialogTitle>
                   <DialogDescription>
-                    Enter one product per line in the format: Name, Quantity, Price, Threshold
+                    Enter one product per line in the format: Name, Quantity, Price, Threshold, Category, Barcode
                   </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <Textarea
-                    placeholder="Product A, 100, 19.99, 20
-Product B, 75, 29.99, 15"
+                    placeholder="Product A, 100, 19.99, 20, Electronics, BAR123              
+                    Product B, 75, 29.99, 15, Groceries, BAR456"
                     value={bulkEntryData}
                     onChange={(e) => setBulkEntryData(e.target.value)}
                     rows={5}
@@ -411,6 +735,25 @@ Product B, 75, 29.99, 15"
             </Dialog>
           </div>
         </div>
+        
+        {/* Filter chip/badge when category is selected */}
+        {selectedCategory !== "All" && (
+          <div className="mb-4 flex items-center">
+            <div className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-sm">
+              <Tag className="mr-1 h-3 w-3" />
+              {selectedCategory}
+              <button 
+                className="ml-2 hover:text-blue-700"
+                onClick={() => setSelectedCategory("All")}
+              >
+                ×
+              </button>
+            </div>
+            <span className="ml-2 text-sm text-gray-500">
+              {filteredProducts.length} {filteredProducts.length === 1 ? 'item' : 'items'} found
+            </span>
+          </div>
+        )}
         
         <div className="rounded-md border">
           <Table>
@@ -431,6 +774,17 @@ Product B, 75, 29.99, 15"
                 currentItems.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
+                    <TableCell>
+                      {product.category ? (
+                        <div className="flex items-center">
+                          <Tag className="mr-2 h-4 w-4 text-blue-500" />
+                          {product.category}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{product.barcode || <span className="text-gray-400">-</span>}</TableCell>
                     <TableCell>{product.quantity}</TableCell>
                     <TableCell>${parseFloat(product.price).toFixed(2)}</TableCell>
                     <TableCell>{product.threshold}</TableCell>
@@ -481,6 +835,42 @@ Product B, 75, 29.99, 15"
                                   className="col-span-3"
                                   disabled={actionLoading.id === product.id}
                                 />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-barcode" className="text-right">
+                                  Barcode
+                                </Label>
+                                <Input
+                                  id="edit-barcode"
+                                  name="barcode"
+                                  value={editingProduct.barcode || ''}
+                                  onChange={handleInputChange}
+                                  className="col-span-3"
+                                  disabled={actionLoading.id === product.id}
+                                />
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-category" className="text-right">
+                                  Category
+                                </Label>
+                                <div className="col-span-3 flex space-x-2">
+                                  <Select 
+                                    value={editingProduct.category || ''} 
+                                    onValueChange={handleSelectChange}
+                                    disabled={actionLoading.id === product.id}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Select a category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {categories.map((category) => (
+                                        <SelectItem key={category} value={category}>
+                                          {category}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
                               <div className="grid grid-cols-4 items-center gap-4">
                                 <Label
@@ -566,8 +956,10 @@ Product B, 75, 29.99, 15"
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6">
-                    {searchTerm ? 'No products match your search.' : 'No products found. Add some to get started!'}
+                  <TableCell colSpan={8} className="text-center py-6">
+                    {searchTerm || selectedCategory !== "All" 
+                      ? 'No products match your filters.' 
+                      : 'No products found. Add some to get started!'}
                   </TableCell>
                 </TableRow>
               )}
