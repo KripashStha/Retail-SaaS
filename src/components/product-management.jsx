@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,8 @@ import {
   AlertTriangle, 
   Loader2,
   Tag,
-  Filter
+  Filter,
+  Upload
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -71,8 +72,10 @@ export function InventoryTracking() {
     barcode: "",
   });
   const [bulkEntryData, setBulkEntryData] = useState("");
+  const [file, setFile] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isBulkImportDialogOpen, setIsBulkImportDialogOpen] = useState(false);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -485,6 +488,7 @@ export function InventoryTracking() {
       await fetchProducts();
       setBulkEntryData("");
       setError(null);
+      setIsBulkImportDialogOpen(false); 
       
       toast({
         title: "Success",
@@ -502,6 +506,22 @@ export function InventoryTracking() {
       setActionLoading({ id: null, type: null });
     }
   };
+
+  const handleFileChange = (event) => {
+      if (event.target.files) {
+        setFile(event.target.files[0]);
+      }
+    };
+  
+    const handleUpload = () => {
+      if (file) {
+        console.log(`Uploading file: ${file.name}`);
+        toast({
+          title: "CSV Upload",
+          description: `File ${file.name} has been uploaded successfully.`,
+        });
+      }
+    };
 
   if (loading && !products.length) {
     return (
@@ -553,7 +573,7 @@ export function InventoryTracking() {
                 </SelectContent>
               </Select>
               
-              {/* Add Category Button - Moved here */}
+              {/* Add Category Button*/}
               <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="icon" className="flex-shrink-0">
@@ -700,7 +720,7 @@ export function InventoryTracking() {
               </DialogContent>
             </Dialog>
 
-            <Dialog>
+            <Dialog open={isBulkImportDialogOpen} onOpenChange={setIsBulkImportDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   Bulk Import
@@ -713,7 +733,7 @@ export function InventoryTracking() {
                     Enter one product per line in the format: Name, Quantity, Price, Threshold, Category, Barcode
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
+                <div className="py-2">
                   <Textarea
                     placeholder="Product A, 100, 19.99, 20, Electronics, BAR123              
                     Product B, 75, 29.99, 15, Groceries, BAR456"
@@ -723,14 +743,35 @@ export function InventoryTracking() {
                     disabled={actionLoading.id === 'bulk'}
                   />
                 </div>
-                <DialogFooter>
+                
                   <Button onClick={handleBulkEntry} disabled={actionLoading.id === 'bulk'}>
                     {actionLoading.id === 'bulk' && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Import Products
                   </Button>
-                </DialogFooter>
+                
+                <DialogHeader className="mt-4">
+                        <DialogTitle>CSV Upload</DialogTitle>
+                        <DialogDescription>
+                          Upload your inventory data using a CSV file
+                        </DialogDescription>
+                      </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="csv">CSV File</Label>
+                            <Input
+                              id="csv"
+                              type="file"
+                              accept=".csv"
+                              onChange={handleFileChange}
+                            />
+                          </div>
+                          <Button onClick={handleUpload} disabled={!file}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload CSV
+                          </Button>
+                        </div>  
               </DialogContent>
             </Dialog>
           </div>
