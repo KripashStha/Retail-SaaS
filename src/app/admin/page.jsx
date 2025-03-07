@@ -137,8 +137,6 @@ export default function DashboardPage() {
         return <PointOfSale />;
       case "alerts":
         return <AlertSystem />;
-      case "upload":
-        return <CSVUpload />;
       case "employee":
         return <Employee />;
       default:
@@ -212,22 +210,6 @@ export default function DashboardPage() {
               <Badge className="ml-auto">New</Badge>
             </Button>
             <Button
-              variant={currentView === "alerts" ? "secondary" : "ghost"}
-              className="w-full justify-start text-base hover:bg-indigo-600/70 hover:text-white"
-              onClick={() => setCurrentView("alerts")}
-            >
-              <Bell className="h-5 w-5 mr-3" />
-              <span>Alerts</span>
-            </Button>
-            <Button
-              variant={currentView === "upload" ? "secondary" : "ghost"}
-              className="w-full justify-start text-base hover:bg-indigo-600/70 hover:text-white"
-              onClick={() => setCurrentView("upload")}
-            >
-              <FileSpreadsheet className="h-5 w-5 mr-3" />
-              <span>CSV Upload</span>
-            </Button>
-            <Button
               variant={currentView === "employee" ? "secondary" : "ghost"}
               className="w-full justify-start text-base hover:bg-indigo-600/70 hover:text-white"
               onClick={() => setCurrentView("employee")}
@@ -245,6 +227,7 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 className="w-full justify-start text-base hover:bg-indigo-600/70 hover:text-white"
+                onClick={() => setCurrentView("alerts")}
               >
                 <Bell className="h-5 w-5 mr-3" />
                 <span>Notifications</span>
