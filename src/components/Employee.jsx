@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreVertical, Edit, Trash2, Plus, Search } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, Plus, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -354,20 +354,20 @@ export default function Employee() {
                     ) : (
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm">
+                          <Button variant="ghost" size="icon">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent align="end" className="w-54 ">
-                          <div className="flex flex-col space-y-1">
+                        <PopoverContent align="end" className="w-36 p-2 ">
+                          
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
-                                  className="justify-start"
+                                  className="w-full flex items-center justify-start"
                                   variant="ghost"
                                   size="sm"
                                 >
-                                  <Edit className="h-4 w-4" /> Edit
+                                  <Pencil className="h-4 w-4" /> Edit
                                 </Button>
                               </DialogTrigger>
                               <DialogContent>
@@ -414,7 +414,7 @@ export default function Employee() {
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
-                                  className="justify-start text-red-500"
+                                  className="w-full flex items-center justify-start text-red-500"
                                   variant="ghost"
                                   size="sm"
                                 >
@@ -444,7 +444,7 @@ export default function Employee() {
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
-                          </div>
+                        
                         </PopoverContent>
                       </Popover>
                     )}

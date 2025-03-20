@@ -14,7 +14,6 @@ import { RecentSales } from "@/components/recent-sales";
 import { InventoryTracking } from "@/components/product-management";
 import { PointOfSale } from "@/components/point-of-sale";
 import { AlertSystem } from "@/components/alert-system";
-import { CSVUpload } from "@/components/csv-upload";
 import  Employee  from "@/components/Employee";
 import {
   AlertTriangle,
@@ -42,6 +41,9 @@ import { db, auth } from "@/firebase/dbConfig";
 import { getDoc, doc, collection } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import  Profile from "@/components/Profile";
+import { NotificationSystem } from "@/components/notification-system";
+import { SettingsPanel } from "@/components/settings-panel";
+import { NotificationBadge } from "@/components/notification-badge";
 
 export default function DashboardPage() {
   const [currentView, setCurrentView] = useState("dashboard");
@@ -139,6 +141,10 @@ export default function DashboardPage() {
         return <AlertSystem />;
       case "employee":
         return <Employee />;
+      case "notifications":
+        return <NotificationSystem />;
+      case "settings":
+        return <SettingsPanel />;
       default:
         return null;
     }
@@ -206,8 +212,7 @@ export default function DashboardPage() {
               onClick={() => setCurrentView("pos")}
             >
               <ShoppingCart className="h-5 w-5 mr-3" />
-              <span>POS</span>
-              <Badge className="ml-auto">New</Badge>
+              <span>Point of Sale</span>
             </Button>
             <Button
               variant={currentView === "employee" ? "secondary" : "ghost"}
@@ -217,13 +222,31 @@ export default function DashboardPage() {
               <Users className="h-5 w-5 mr-3" />
               <span>Employees</span>
             </Button>
+            <Button
+              variant={currentView === "notifications" ? "default" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => setCurrentView("notifications")}
+            >
+              
+                <NotificationBadge className="h-5 w-5 mr-3"/>
+                <span className="ml-2">Notifications</span>
+              
+            </Button>
+            <Button
+              variant={currentView === "settings" ? "default" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => setCurrentView("settings")}
+            >
+              <Settings className="mr-2 h-5 w-5" />
+              Settings
+            </Button>
           </nav>
         </div>
 
         {/* Bottom Section */}
         <div className="absolute bottom-0 w-64 border-t">
           <div className="px-3 py-4">
-            <nav className="space-y-1">
+            {/* <nav className="space-y-1">
               <Button
                 variant="ghost"
                 className="w-full justify-start text-base hover:bg-indigo-600/70 hover:text-white"
@@ -239,7 +262,7 @@ export default function DashboardPage() {
                 <Settings className="h-5 w-5 mr-3" />
                 <span>Settings</span>
               </Button>
-            </nav>
+            </nav> */}
 
             {/* User Profile */}
             <Profile/>
