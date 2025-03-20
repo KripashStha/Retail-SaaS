@@ -56,14 +56,15 @@ import {
 } from "firebase/firestore";
 import { BrowserMultiFormatReader } from "@zxing/library";
 import debounce from "lodash/debounce";
+import { createSaleNotification, createLowStockNotification, shouldNotifyLowStock } from "@/utils/notification-utils";
+import { useInventory } from "@/contexts/inventory-context";
 
 export function PointOfSale() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [stream, setStream] = useState(null);
-  const [businessId, setBusinessId] = useState(null);
   const [taxRate, setTaxRate] = useState(0.1); // 10% default tax rate
   const [discountType, setDiscountType] = useState("none"); // 'none', 'percentage', 'fixed'
   const [discountValue, setDiscountValue] = useState(0);
@@ -74,6 +75,9 @@ export function PointOfSale() {
   const [isScannerReady, setIsScannerReady] = useState(false);
   const codeReader = useRef(new BrowserMultiFormatReader());
 
+  // Get products and businessId from inventory context
+  const { products, loading, error, businessId, searchProducts } = useInventory();
+
   // Create a debounced search function
   const debouncedSearchProducts = useRef(
     debounce((term) => {
@@ -81,14 +85,20 @@ export function PointOfSale() {
     }, 300)
   ).current;
 
-  // Memoize filtered products to avoid recalculating on every render
-  const filteredProducts = useMemo(() => {
-    return products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.barcode.includes(searchTerm) ||
-        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Update filtered products whenever search term or products change
+  useEffect(() => {
+    if (searchTerm) {
+      setFilteredProducts(
+        products.filter(
+          (product) =>
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.barcode?.includes(searchTerm) ||
+            product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+    } else {
+      setFilteredProducts(products);
+    }
   }, [searchTerm, products]);
 
   // Initialize barcode scanner with improved error handling
@@ -175,63 +185,28 @@ export function PointOfSale() {
     }
   };
 
-  // Fetch business ID and products with error handling
+  // Fetch tax rate from business data
   useEffect(() => {
     const fetchBusinessData = async () => {
       try {
-        if (auth.currentUser) {
-          const userDoc = await getDocs(
-            query(
-              collection(db, "Users"),
-              where("email", "==", auth.currentUser.email)
-            )
-          );
-          if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            const businessId = userData.businessId;
-            setBusinessId(businessId);
-
-            // Also get business tax rate if available
-            if (userData.businessTaxRate !== undefined) {
-              setTaxRate(userData.businessTaxRate);
-            }
-
-            // Fetch products for this business
-            const productsQuery = query(
-              collection(db, "products"),
-              where("businessId", "==", businessId)
-            );
-            const productsSnapshot = await getDocs(productsQuery);
-            const productsData = productsSnapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }));
-            console.log("Loaded products:", productsData); // Debug log
-            setProducts(productsData);
-          } else {
-            toast({
-              title: "User Not Found",
-              description: "Your user profile could not be found.",
-              variant: "destructive",
-            });
+        if (businessId) {
+          const businessDoc = await getDoc(doc(db, "businesses", businessId));
+          if (businessDoc.exists() && businessDoc.data().taxRate) {
+            setTaxRate(businessDoc.data().taxRate);
           }
         }
       } catch (error) {
-        console.error("Error fetching business data:", error);
-        toast({
-          title: "Data Loading Error",
-          description: "Failed to load business data. Please refresh the page.",
-          variant: "destructive",
-        });
+        console.error("Error fetching business tax rate:", error);
       }
     };
+
     fetchBusinessData();
 
     // Cleanup function to ensure camera is properly released when component unmounts
     return () => {
       cleanupScanner();
     };
-  }, []);
+  }, [businessId]);
 
   // Handle search input changes with debounce
   const handleSearchChange = (e) => {
@@ -271,11 +246,14 @@ export function PointOfSale() {
       const existingItem = prevCart.find((item) => item.id === product.id);
 
       if (existingItem) {
+        // Get the latest product data from context for stock validation
+        const latestProductData = products.find(p => p.id === product.id);
+        
         // Check if adding another would exceed available stock
-        if (existingItem.quantity >= product.quantity) {
+        if (existingItem.quantity >= latestProductData.quantity) {
           toast({
             title: "Stock Limit Reached",
-            description: `Only ${product.quantity} units of ${product.name} available.`,
+            description: `Only ${latestProductData.quantity} units of ${latestProductData.name} available.`,
             variant: "destructive",
           });
           return prevCart;
@@ -292,11 +270,11 @@ export function PointOfSale() {
     });
   };
 
-  // Update cart item quantity with stock validation
+  // Update cart item quantity with real-time stock validation
   const updateQuantity = (productId, newQuantity) => {
     if (newQuantity < 1) return;
 
-    // Find the product to check stock
+    // Find the product using real-time data to check stock
     const product = products.find((p) => p.id === productId);
     if (product && newQuantity > product.quantity) {
       toast({
@@ -326,21 +304,19 @@ export function PointOfSale() {
     try {
       setIsProcessing(true);
 
-      // Validate stock levels one more time before processing
+      // Validate stock levels one more time before processing using real-time data
       for (const item of cart) {
-        const productRef = doc(db, "products", item.id);
-        const productDoc = await getDoc(productRef);
-
-        if (!productDoc.exists()) {
+        const currentProduct = products.find(p => p.id === item.id);
+        
+        if (!currentProduct) {
           throw new Error(
             `Product "${item.name}" no longer exists in the database.`
           );
         }
 
-        const currentStock = productDoc.data().quantity;
-        if (currentStock < item.quantity) {
+        if (currentProduct.quantity < item.quantity) {
           throw new Error(
-            `Not enough stock for "${item.name}". Only ${currentStock} available.`
+            `Not enough stock for "${item.name}". Only ${currentProduct.quantity} available.`
           );
         }
       }
@@ -356,6 +332,7 @@ export function PointOfSale() {
           name: item.name,
           price: item.price,
           quantity: item.quantity,
+          category: item.category,
           total: item.price * item.quantity,
         })),
         subtotal,
@@ -380,6 +357,7 @@ export function PointOfSale() {
         await updateDoc(productRef, {
           quantity: currentQuantity - item.quantity,
           lastSold: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
       }
 
@@ -388,6 +366,23 @@ export function PointOfSale() {
         ...saleData,
         timestamp: new Date().toISOString(),
       });
+
+      // Create sale notification
+      await createSaleNotification(saleData, businessId);
+      
+      // Check for low stock after updating inventory
+      for (const item of cart) {
+        const productRef = doc(db, "products", item.id);
+        const productDoc = await getDoc(productRef);
+        const updatedProduct = {
+          id: item.id,
+          ...productDoc.data()
+        };
+        
+        if (shouldNotifyLowStock(updatedProduct)) {
+          await createLowStockNotification(updatedProduct, businessId);
+        }
+      }
 
       // Clear cart and discounts
       setCart([]);
@@ -665,6 +660,25 @@ export function PointOfSale() {
     }
   };
 
+  // Show loading indicator while products are being fetched
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p>Loading product data...</p>
+      </div>
+    );
+  }
+
+  // Show error message if something went wrong
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-800 rounded-md border border-red-200">
+        <h3 className="text-lg font-semibold">Error loading products</h3>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Left side - Product Search and Scanner */}
@@ -749,7 +763,7 @@ export function PointOfSale() {
                     filteredProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>${product.price.toFixed(2)}</TableCell>
+                        <TableCell>${product.price?.toFixed(2) || "0.00"}</TableCell>
                         <TableCell>
                           {product.quantity <= 0 ? (
                             <span className="text-red-500 flex items-center">
