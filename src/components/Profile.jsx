@@ -69,7 +69,7 @@ function Profile() {
     <div>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start mt-4">
+          <Button variant="ghost" className="w-full justify-start mt-2 mb-2">
             <Avatar className="h-7 w-7 mr-2">
               <AvatarImage />
               <AvatarFallback className="bg-pink-500 text-white">

@@ -8,71 +8,116 @@ import {
   collection,
   query,
   where,
-  getDocs,
   onSnapshot,
+  getDocs,
   orderBy,
 } from "firebase/firestore";
 
 export function NotificationBadge() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [businessId, setBusinessId] = useState(null);
 
+  // First, get the business ID when component mounts or auth changes
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const fetchBusinessId = async () => {
       try {
-        if (auth.currentUser) {
-          const userDoc = await getDocs(
-            query(
-              collection(db, "Users"),
-              where("email", "==", auth.currentUser.email)
-            )
-          );
-          
-          if (!userDoc.empty) {
-            const businessId = userDoc.docs[0].data().businessId;
-            
-            // Set up real-time listener for unread notifications
-            const notificationsQuery = query(
-              collection(db, "notifications"),
-              where("businessId", "==", businessId),
-              where("read", "==", false),
-              orderBy("timestamp", "desc")
-            );
-            
-            const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-              setUnreadCount(snapshot.docs.length);
-              setLoading(false);
-            }, (error) => {
-              console.error("Notification badge error:", error);
-              setLoading(false);
-            });
-            
-            return () => unsubscribe();
-          }
+        if (!auth.currentUser) {
+          setLoading(false);
+          return;
         }
-        setLoading(false);
+
+        console.log("Fetching business ID for notifications...");
+        const userQuery = query(
+          collection(db, "Users"),
+          where("email", "==", auth.currentUser.email)
+        );
+        
+        const userSnapshot = await getDocs(userQuery);
+        if (!userSnapshot.empty) {
+          const userData = userSnapshot.docs[0].data();
+          console.log("Found business ID:", userData.businessId);
+          setBusinessId(userData.businessId);
+        } else {
+          console.error("No user document found for email:", auth.currentUser.email);
+          setLoading(false);
+        }
       } catch (error) {
-        console.error("Error fetching notifications:", error);
+        console.error("Error fetching business ID:", error);
         setLoading(false);
       }
     };
-    
-    fetchNotifications();
+
+    // Set up auth state listener
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchBusinessId();
+      } else {
+        setBusinessId(null);
+        setUnreadCount(0);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  if (loading) return <Bell className="h-5 w-5" />;
+  // Set up a listener for unread notifications when we have a business ID
+  useEffect(() => {
+    if (!businessId) return;
 
+    console.log("Setting up notification listener for business:", businessId);
+    
+    // Create a query for unread notifications
+    const unreadQuery = query(
+      collection(db, "notifications"),
+      where("businessId", "==", businessId),
+      where("read", "==", false)
+    );
+
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(
+      unreadQuery,
+      (snapshot) => {
+        const count = snapshot.docs.length;
+        console.log(`Found ${count} unread notifications`);
+        setUnreadCount(count);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error in notification listener:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [businessId]);
+
+  // While loading, show a subtle loading indicator
+  if (loading) {
+    return (
+      <div className="relative">
+        <Bell className="h-5 w-5 text-muted" />
+        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-300 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-gray-400"></span>
+        </span>
+      </div>
+    );
+  }
+
+  // When loaded, show notification bell with badge if there are unread notifications
   return (
     <div className="relative">
-      <Bell className="h-5 w-5" />
+      <Bell className="h-5 w-5 mr-3" />
       {unreadCount > 0 && (
         <Badge 
-          variant="destructive" 
-          className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
+          className="absolute -top-1 -right-44 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white border-none" 
+          variant="destructive"
         >
-          {unreadCount > 99 ? "99+" : unreadCount}
+          {unreadCount > 9 ? '9+' : unreadCount}
         </Badge>
       )}
     </div>
   );
-} 
+}

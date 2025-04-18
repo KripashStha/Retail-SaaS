@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,13 +62,12 @@ import {
   shouldNotifyLowStock,
 } from "@/utils/notification-utils";
 import { useInventory } from "@/contexts/inventory-context";
+import { useCurrency } from "@/contexts/currency-context";
+import { CurrencyFormatter } from "@/components/currency-formatter";
 
 export function CsvUpload() {
-  const { businessId } = useInventory();
-  
   const [file, setFile] = useState(null);
   const [parsedData, setParsedData] = useState([]);
-  const [previewData, setPreviewData] = useState([]);
   const [mappedFields, setMappedFields] = useState({});
   const [errors, setErrors] = useState([]);
   const [warnings, setWarnings] = useState([]);
@@ -77,8 +76,14 @@ export function CsvUpload() {
   const [showPreview, setShowPreview] = useState(false);
   const [uploadSummary, setUploadSummary] = useState(null);
   const [showTemplate, setShowTemplate] = useState(false);
+  const [previewData, setPreviewData] = useState([]);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
+  
+  // Get businessId from inventory context
+  const { businessId } = useInventory();
+
+  const { formatCurrency } = useCurrency();
 
   // Required fields for product data
   const requiredFields = ["name", "price", "quantity", "category"];
@@ -87,7 +92,6 @@ export function CsvUpload() {
   const allFields = [
     "id",
     "name",
-    "description",
     "category",
     "price",
     "quantity",
@@ -235,6 +239,41 @@ export function CsvUpload() {
 
     // Show preview dialog
     setShowPreview(true);
+  };
+
+  // Download CSV template
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        name: "Sample Product 1",
+        description: "This is a sample product description",
+        category: "Category A",
+        price: "19.99",
+        quantity: "100",
+        threshold: "10",
+        barcode: "123456789012",
+      },
+      {
+        name: "Sample Product 2",
+        description: "Another sample product",
+        category: "Category B",
+        price: "29.99",
+        quantity: "50",
+        threshold: "5",
+        barcode: "223456789012",
+      },
+    ];
+
+    const csv = Papa.unparse(templateData);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "inventory_template.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Process the upload to Firestore
@@ -399,6 +438,9 @@ export function CsvUpload() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>CSV Inventory Upload</span>
+          <Button variant="outline" size="sm" onClick={() => setShowTemplate(true)}>
+            View Template
+          </Button>
         </CardTitle>
         <CardDescription>
           Upload a CSV file to bulk update your inventory
@@ -410,12 +452,12 @@ export function CsvUpload() {
           <div className="space-y-2">
             <Label htmlFor="csv-file">Select CSV File</Label>
             <div className="flex gap-2">
-              <Input
+            <Input
                 id="csv-file"
-                type="file"
-                accept=".csv"
+              type="file"
+              accept=".csv"
                 ref={fileInputRef}
-                onChange={handleFileChange}
+              onChange={handleFileChange}
                 className="flex-1"
               />
               {file && (
@@ -424,10 +466,15 @@ export function CsvUpload() {
                 </Button>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              File must be in CSV format with headers. Required fields: name,
-              price, quantity, category.
-            </p>
+            {/* <div className="flex justify-between text-sm text-muted-foreground">
+              <p>
+                File must be in CSV format with headers. Required fields: name,
+                price, quantity, category.
+              </p>
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={downloadTemplate}>
+                Download Template
+              </Button>
+            </div> */}
           </div>
 
           {/* File Info */}
@@ -534,15 +581,65 @@ export function CsvUpload() {
         </Button>
       </CardFooter>
 
+      {/* Template Dialog */}
+      <Dialog open={showTemplate} onOpenChange={setShowTemplate}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>CSV Template Format</DialogTitle>
+            <DialogDescription>
+              Your CSV file should include these columns. Download the template for a ready-to-use example.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {allFields.map(field => (
+                    <TableHead key={field} className={requiredFields.includes(field) ? "font-bold" : ""}>
+                      {field} {requiredFields.includes(field) && "*"}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell>Leave empty for new products</TableCell>
+                  <TableCell>Product Name</TableCell>
+                  <TableCell>Category name</TableCell>
+                  <TableCell>19.99</TableCell>
+                  <TableCell>100</TableCell>
+                  <TableCell>10</TableCell>
+                  <TableCell>123456789012</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">* Required fields</p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowTemplate(false)}>
+                Close
+              </Button>
+              <Button onClick={downloadTemplate}>
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+            </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl">
-          <DialogHeader>
+            <DialogHeader>
             <DialogTitle>Preview Data</DialogTitle>
-            <DialogDescription>
+              <DialogDescription>
               Review all rows of your data before uploading.
-            </DialogDescription>
-          </DialogHeader>
+              </DialogDescription>
+            </DialogHeader>
 
           <ScrollArea className="h-[400px]">
             <Table>
@@ -559,7 +656,7 @@ export function CsvUpload() {
                     {Object.values(mappedFields).map((field, cellIndex) => (
                       <TableCell key={cellIndex}>
                         {field === "price"
-                          ? `$${parseFloat(row[field]).toFixed(2)}`
+                          ? <CurrencyFormatter value={parseFloat(row[field])} />
                           : row[field]}
                       </TableCell>
                     ))}
@@ -569,7 +666,7 @@ export function CsvUpload() {
             </Table>
           </ScrollArea>
 
-          <DialogFooter>
+            <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Cancel
             </Button>
@@ -583,9 +680,9 @@ export function CsvUpload() {
                 "Confirm Upload"
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </Card>
   );
 }

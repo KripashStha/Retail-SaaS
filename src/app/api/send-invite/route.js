@@ -15,29 +15,96 @@ export async function POST(request) {
       to: email,
       subject: 'Invitation to join Easy Inventory Management',
       html: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .footer { font-size: 14px; color: #666; margin-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h2>Welcome to Easy Inventory Management!</h2>
-              <p>You've been invited to join as a <strong>${role}</strong>.</p>
-              <p>Click the button below to accept the invitation:</p>
-              <a href="${inviteUrl}" style="color: white; background-color: #4F46E5; padding: 12px 24px; text-decoration: none; 
-              border-radius: 6px; margin: 20px 0;" class="button">Accept Invitation</a>
-              <p class="footer">
-                This invitation will expire in 7 days.<br>
-                If you didn't expect this invitation, please ignore this email.
-              </p>
-            </div>
-          </body>
-        </html>
+       <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Invitation - Easy Inventory Management</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8;
+        margin: 0;
+        padding: 0;
+        
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background-color: #ffffff;
+        padding: 40px 30px;
+        border-radius: 10px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      }
+
+      h2 {
+        color: #1f2937;
+        font-size: 26px;
+        margin-bottom: 20px;
+      }
+
+      p {
+        font-size: 16px;
+        margin: 15px 0;
+        line-height: 1.6;
+      }
+
+      .button {
+        display: inline-block;
+        background-color: #4f46e5;
+        padding: 14px 28px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 20px 0;
+        transition: background-color 0.3s ease;
+      }
+
+      .button:hover {
+        background-color: #4338ca;
+      }
+
+      .footer {
+        font-size: 14px;
+        color: #777;
+        margin-top: 30px;
+        border-top: 1px solid #eee;
+        padding-top: 20px;
+      }
+
+      @media (max-width: 600px) {
+        .container {
+          padding: 20px;
+        }
+
+        h2 {
+          font-size: 22px;
+        }
+
+        .button {
+          width: 100%;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>You're Invited to Join Easy Inventory Management</h2>
+      <p>Hello,</p>
+      <p>We're excited to have you onboard! You've been invited to join as a <strong>${role}</strong>.</p>
+      <p>Click the button below to accept your invitation and get started:</p>
+      <a href="${inviteUrl}" style="color:white" class="button">Accept Invitation</a>
+      <p class="footer">
+        This invitation link will expire in 7 days.<br />
+        If you did not request or expect this invitation, please disregard this email.
+      </p>
+    </div>
+  </body>
+</html>
+
       `
     });
 

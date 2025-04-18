@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { auth, db } from "@/firebase/dbConfig";
 import {
   createUserWithEmailAndPassword,
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 
-export default function AcceptInvite() {
+function InviteAcceptContent() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -205,5 +205,19 @@ export default function AcceptInvite() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AcceptInvite() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <InviteAcceptContent />
+    </Suspense>
   );
 }

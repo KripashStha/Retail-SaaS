@@ -555,7 +555,7 @@ export function InventoryTracking() {
           </div>
         </div>
         
-        {/* Filter chip/badge when category is selected */}
+        {/* Filter chip/badge when category is selected  */}
         {selectedCategory !== "All" && (
           <div className="mb-4 flex items-center">
             <div className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-sm">

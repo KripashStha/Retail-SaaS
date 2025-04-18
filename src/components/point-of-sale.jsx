@@ -56,8 +56,14 @@ import {
 } from "firebase/firestore";
 import { BrowserMultiFormatReader } from "@zxing/library";
 import debounce from "lodash/debounce";
-import { createSaleNotification, createLowStockNotification, shouldNotifyLowStock } from "@/utils/notification-utils";
+import {
+  createSaleNotification,
+  createLowStockNotification,
+  shouldNotifyLowStock,
+} from "@/utils/notification-utils";
 import { useInventory } from "@/contexts/inventory-context";
+import { CurrencyFormatter } from "@/components/currency-formatter";
+import { useCurrency } from "@/contexts/currency-context";
 
 export function PointOfSale() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,7 +71,7 @@ export function PointOfSale() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [stream, setStream] = useState(null);
-  const [taxRate, setTaxRate] = useState(0.1); // 10% default tax rate
+  const [taxRate, setTaxRate] = useState(10); // 10% default tax rate
   const [discountType, setDiscountType] = useState("none"); // 'none', 'percentage', 'fixed'
   const [discountValue, setDiscountValue] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -74,9 +80,11 @@ export function PointOfSale() {
   const videoRef = useRef(null);
   const [isScannerReady, setIsScannerReady] = useState(false);
   const codeReader = useRef(new BrowserMultiFormatReader());
+  const { currency, getCurrencySymbol } = useCurrency();
 
   // Get products and businessId from inventory context
-  const { products, loading, error, businessId, searchProducts } = useInventory();
+  const { products, loading, error, businessId, searchProducts } =
+    useInventory();
 
   // Create a debounced search function
   const debouncedSearchProducts = useRef(
@@ -127,7 +135,6 @@ export function PointOfSale() {
         },
         videoRef.current,
         (result, error) => {
-
           if (result) {
             const barcode = result.getText();
             console.log("Scanned barcode:", barcode);
@@ -222,13 +229,13 @@ export function PointOfSale() {
 
     let discount = 0;
     if (discountType === "percentage") {
-      discount = subtotal * (discountValue / 100);
+      discount = Math.min(subtotal * (discountValue / 100), subtotal); // Cap percentage discount at 100%
     } else if (discountType === "fixed") {
-      discount = Math.min(discountValue, subtotal); // Don't allow discount > subtotal
+      discount = Math.min(discountValue, subtotal); // Cap fixed discount at subtotal
     }
 
     const discountedSubtotal = subtotal - discount;
-    const tax = discountedSubtotal * taxRate;
+    const tax = (discountedSubtotal * taxRate) / 100;
     const total = discountedSubtotal + tax;
 
     return {
@@ -247,8 +254,8 @@ export function PointOfSale() {
 
       if (existingItem) {
         // Get the latest product data from context for stock validation
-        const latestProductData = products.find(p => p.id === product.id);
-        
+        const latestProductData = products.find((p) => p.id === product.id);
+
         // Check if adding another would exceed available stock
         if (existingItem.quantity >= latestProductData.quantity) {
           toast({
@@ -306,8 +313,8 @@ export function PointOfSale() {
 
       // Validate stock levels one more time before processing using real-time data
       for (const item of cart) {
-        const currentProduct = products.find(p => p.id === item.id);
-        
+        const currentProduct = products.find((p) => p.id === item.id);
+
         if (!currentProduct) {
           throw new Error(
             `Product "${item.name}" no longer exists in the database.`
@@ -369,16 +376,16 @@ export function PointOfSale() {
 
       // Create sale notification
       await createSaleNotification(saleData, businessId);
-      
+
       // Check for low stock after updating inventory
       for (const item of cart) {
         const productRef = doc(db, "products", item.id);
         const productDoc = await getDoc(productRef);
         const updatedProduct = {
           id: item.id,
-          ...productDoc.data()
+          ...productDoc.data(),
         };
-        
+
         if (shouldNotifyLowStock(updatedProduct)) {
           await createLowStockNotification(updatedProduct, businessId);
         }
@@ -763,7 +770,9 @@ export function PointOfSale() {
                     filteredProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>${product.price?.toFixed(2) || "0.00"}</TableCell>
+                        <TableCell>
+                          <CurrencyFormatter value={product.price || 0} />
+                        </TableCell>
                         <TableCell>
                           {product.quantity <= 0 ? (
                             <span className="text-red-500 flex items-center">
@@ -839,7 +848,7 @@ export function PointOfSale() {
                         />
                       </TableCell>
                       <TableCell>
-                        ${(item.price * item.quantity).toFixed(2)}
+                        <CurrencyFormatter value={item.price * item.quantity} />
                       </TableCell>
                       <TableCell>
                         <Button
@@ -873,7 +882,9 @@ export function PointOfSale() {
                     <SelectContent>
                       <SelectItem value="none">No Discount</SelectItem>
                       <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                      <SelectItem value="fixed">
+                        Fixed Amount ({getCurrencySymbol()})
+                      </SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -881,12 +892,28 @@ export function PointOfSale() {
                     <Input
                       type="number"
                       min="0"
+                      max={
+                        discountType === "percentage"
+                          ? 100
+                          : calculateTotals.subtotal
+                      }
                       value={discountValue}
                       onChange={(e) =>
-                        setDiscountValue(parseFloat(e.target.value) || 0)
+                        setDiscountValue(
+                          Math.min(
+                            parseFloat(e.target.value) || 0,
+                            discountType === "percentage"
+                              ? 100
+                              : calculateTotals.subtotal
+                          )
+                        )
                       }
                       className="w-24"
-                      placeholder={discountType === "percentage" ? "%" : "$"}
+                      placeholder={
+                        discountType === "percentage"
+                          ? "%"
+                          : `${getCurrencySymbol()}`
+                      }
                     />
                   )}
                 </div>
@@ -895,16 +922,21 @@ export function PointOfSale() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4">
-          <div className="text-right">
-            <p>Subtotal: ${calculateTotals.subtotal.toFixed(2)}</p>
-
+          <div className="text-right mt-4">
+            <p>
+              Subtotal: <CurrencyFormatter value={calculateTotals.subtotal} />
+            </p>
             {calculateTotals.discount > 0 && (
-              <p>Discount: -${calculateTotals.discount.toFixed(2)}</p>
+              <p>
+                Discount: -
+                <CurrencyFormatter value={calculateTotals.discount} />
+              </p>
             )}
-
-            <p>Tax: ${calculateTotals.tax.toFixed(2)}</p>
+            <p>
+              Tax: <CurrencyFormatter value={calculateTotals.tax} />
+            </p>
             <p className="text-lg font-bold">
-              Total: ${calculateTotals.total.toFixed(2)}
+              Total: <CurrencyFormatter value={calculateTotals.total} />
             </p>
           </div>
           <div className="flex gap-2">

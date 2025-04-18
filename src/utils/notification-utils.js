@@ -1,5 +1,41 @@
 import { auth, db } from "@/firebase/dbConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getDoc, doc } from "firebase/firestore";
+
+/**
+ * Gets the current currency symbol from the business settings
+ * @param {string} businessId - The business ID
+ * @returns {Promise<string>} - Promise resolving to the currency symbol
+ */
+export const getCurrencySymbol = async (businessId) => {
+  try {
+    if (!businessId) return "$"; // Default fallback
+    
+    const businessDoc = await getDoc(doc(db, "businesses", businessId));
+    if (businessDoc.exists()) {
+      const { currency = "USD" } = businessDoc.data();
+      
+      // Currency symbol mapping - simplified version
+      const symbols = {
+        USD: "$",
+        EUR: "€",
+        GBP: "£",
+        JPY: "¥",
+        CAD: "C$",
+        AUD: "A$",
+        INR: "₹",
+        NPR: "रू",
+      };
+      
+      return symbols[currency] || "$";
+    }
+    
+    return "$"; // Default fallback
+  } catch (error) {
+    console.error("Error getting currency symbol:", error);
+    return "$"; // Default fallback
+  }
+};
 
 /**
  * Creates a low stock notification for a product
@@ -72,9 +108,10 @@ export const createSaleNotification = async (saleData, businessId) => {
       return null;
     }
 
+    const currencySymbol = await getCurrencySymbol(businessId);
     const itemCount = saleData.items.reduce((sum, item) => sum + item.quantity, 0);
-    const title = `New Sale: $${saleData.total.toFixed(2)}`;
-    const message = `A sale of $${saleData.total.toFixed(2)} was completed with ${itemCount} item(s).`;
+    const title = `New Sale: ${currencySymbol}${saleData.total.toFixed(2)}`;
+    const message = `A sale of ${currencySymbol}${saleData.total.toFixed(2)} was completed with ${itemCount} item(s).`;
 
     const notification = await addDoc(collection(db, "notifications"), {
       title,
@@ -107,8 +144,9 @@ export const createNewProductNotification = async (product, businessId) => {
       return null;
     }
 
+    const currencySymbol = await getCurrencySymbol(businessId);
     const title = `New Product Added: ${product.name}`;
-    const message = `A new product "${product.name}" has been added to inventory. Initial stock: ${product.quantity}, Price: $${product.price.toFixed(2)}`;
+    const message = `A new product "${product.name}" has been added to inventory. Initial stock: ${product.quantity}, Price: ${currencySymbol}${product.price.toFixed(2)}`;
 
     console.log("Creating new product notification:", { title, message });
 
@@ -140,9 +178,9 @@ export const createNewProductNotification = async (product, businessId) => {
 
 // Creates a notification for inventory updates
  
-export const createInventoryUpdateNotification = async (product, businessId) => {
+export const createInventoryUpdateNotification = async (product, changes, businessId) => {
   try {
-    if (!product || !businessId) {
+    if (!product || !changes || !businessId) {
       console.error("Missing required parameters for inventory update notification");
       return null;
     }
@@ -150,19 +188,42 @@ export const createInventoryUpdateNotification = async (product, businessId) => 
     let title = `Inventory Updated: ${product.name}`;
     let message = `${product.name} inventory has been updated. `;
     
+    const currencySymbol = await getCurrencySymbol(businessId);
+    
     // Add specific details about what changed
     const changeDetails = [];
-    if (product.quantity !== undefined) {
-      changeDetails.push(`Quantity: ${product.quantity}`);
-    }
-    if (product.price !== undefined) {
-      changeDetails.push(`Price: $${product.price.toFixed(2)}`);
-    }
-    if (product.threshold !== undefined) {
-      changeDetails.push(`Low Stock Threshold: ${product.threshold}`);
+    
+    // Process each changed field
+    if (changes.quantity) {
+      changeDetails.push(`Quantity: ${changes.quantity.from} → ${changes.quantity.to}`);
     }
     
-    message += `Changes: ${changeDetails.join(", ")}`;
+    if (changes.price) {
+      changeDetails.push(`Price: ${currencySymbol}${changes.price.from.toFixed(2)} → ${currencySymbol}${changes.price.to.toFixed(2)}`);
+    }
+    
+    if (changes.threshold) {
+      changeDetails.push(`Low Stock Threshold: ${changes.threshold.from} → ${changes.threshold.to}`);
+    }
+    
+    if (changes.name) {
+      changeDetails.push(`Name: ${changes.name.from} → ${changes.name.to}`);
+    }
+    
+    if (changes.category) {
+      changeDetails.push(`Category: ${changes.category.from || 'None'} → ${changes.category.to || 'None'}`);
+    }
+    
+    if (changes.barcode) {
+      changeDetails.push(`Barcode: ${changes.barcode.from || 'None'} → ${changes.barcode.to || 'None'}`);
+    }
+    
+    // If no specific changes were tracked, provide a generic message
+    if (changeDetails.length === 0) {
+      message += "Product details have been modified.";
+    } else {
+      message += `Changes: ${changeDetails.join(", ")}`;
+    }
 
     console.log("Creating inventory update notification:", { title, message });
 

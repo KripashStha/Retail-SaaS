@@ -2,6 +2,7 @@ import './globals.css'
 import { Inter } from 'next/font/google'
 import { Toaster } from "@/components/ui/toaster"
 import { InventoryProvider } from "@/contexts/inventory-context"
+import { CurrencyProvider } from "@/contexts/currency-context"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,10 +18,12 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/package.svg" />
       </head>
       <body className={inter.className}>
-        <InventoryProvider>
-        {children}
-        <Toaster />
-        </InventoryProvider>
+        <CurrencyProvider>
+          <InventoryProvider>
+            {children}
+            <Toaster />
+          </InventoryProvider>
+        </CurrencyProvider>
       </body>
     </html>
   )
