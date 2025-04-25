@@ -79,7 +79,7 @@ export function CsvUpload() {
   const [previewData, setPreviewData] = useState([]);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
-  
+
   // Get businessId from inventory context
   const { businessId } = useInventory();
 
@@ -307,6 +307,17 @@ export function CsvUpload() {
       let createdCount = 0;
       let errorCount = 0;
 
+      // First, fetch all existing products for this business to check for matches
+      const existingProductsQuery = query(
+        collection(db, "products"),
+        where("businessId", "==", businessId)
+      );
+      const existingProductsSnapshot = await getDocs(existingProductsQuery);
+      const existingProducts = existingProductsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
       // Process in batches
       for (let i = 0; i < totalItems; i += batchSize) {
         const batch = writeBatch(db);
@@ -323,18 +334,46 @@ export function CsvUpload() {
             productData.businessId = businessId;
             productData.updatedAt = serverTimestamp();
 
+            // MATCHING STRATEGY PRIORITY:
+            // 1. First try ID if provided
+            // 2. Then try barcode if available
+            // 3. Finally fallback to name+category matching
+
+            // 1. If ID is provided and valid, use it for update
             if (productData.id) {
-              // Update existing product
               const productRef = doc(db, "products", productData.id);
               const productDoc = await getDoc(productRef);
 
               if (productDoc.exists()) {
                 batch.update(productRef, productData);
                 updatedCount++;
-              }  else {
-                errorCount++;
-                console.warn(`Invalid product ID at row ${item._rowNumber}. Skipping update.`);
+                continue; // Skip to the next item
               }
+            }
+
+            // 2. Try to match by barcode if available (PREFERRED MATCHING)
+            let matchedProduct = null;
+            if (productData.barcode && productData.barcode.trim() !== "") {
+              matchedProduct = existingProducts.find(
+                (p) => p.barcode === productData.barcode
+              );
+            }
+
+            // 3. If no barcode match, fall back to name+category matching
+            if (!matchedProduct && productData.name && productData.category) {
+              matchedProduct = existingProducts.find(
+                (p) =>
+                  p.name?.toLowerCase() === productData.name?.toLowerCase() &&
+                  p.category?.toLowerCase() ===
+                    productData.category?.toLowerCase()
+              );
+            }
+
+            if (matchedProduct) {
+              // Update existing product
+              const productRef = doc(db, "products", matchedProduct.id);
+              batch.update(productRef, productData);
+              updatedCount++;
             } else {
               // Create new product
               const newProductRef = await addDoc(collection(db, "products"), {
@@ -438,7 +477,11 @@ export function CsvUpload() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>CSV Inventory Upload</span>
-          <Button variant="outline" size="sm" onClick={() => setShowTemplate(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTemplate(true)}
+          >
             View Template
           </Button>
         </CardTitle>
@@ -452,12 +495,12 @@ export function CsvUpload() {
           <div className="space-y-2">
             <Label htmlFor="csv-file">Select CSV File</Label>
             <div className="flex gap-2">
-            <Input
+              <Input
                 id="csv-file"
-              type="file"
-              accept=".csv"
+                type="file"
+                accept=".csv"
                 ref={fileInputRef}
-              onChange={handleFileChange}
+                onChange={handleFileChange}
                 className="flex-1"
               />
               {file && (
@@ -587,7 +630,8 @@ export function CsvUpload() {
           <DialogHeader>
             <DialogTitle>CSV Template Format</DialogTitle>
             <DialogDescription>
-              Your CSV file should include these columns. Download the template for a ready-to-use example.
+              Your CSV file should include these columns. Download the template
+              for a ready-to-use example.
             </DialogDescription>
           </DialogHeader>
 
@@ -595,8 +639,13 @@ export function CsvUpload() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {allFields.map(field => (
-                    <TableHead key={field} className={requiredFields.includes(field) ? "font-bold" : ""}>
+                  {allFields.map((field) => (
+                    <TableHead
+                      key={field}
+                      className={
+                        requiredFields.includes(field) ? "font-bold" : ""
+                      }
+                    >
                       {field} {requiredFields.includes(field) && "*"}
                     </TableHead>
                   ))}
@@ -625,7 +674,7 @@ export function CsvUpload() {
               <Button onClick={downloadTemplate}>
                 <Download className="h-4 w-4 mr-2" />
                 Download Template
-            </Button>
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -634,12 +683,12 @@ export function CsvUpload() {
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-4xl">
-            <DialogHeader>
+          <DialogHeader>
             <DialogTitle>Preview Data</DialogTitle>
-              <DialogDescription>
+            <DialogDescription>
               Review all rows of your data before uploading.
-              </DialogDescription>
-            </DialogHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <ScrollArea className="h-[400px]">
             <Table>
@@ -655,9 +704,11 @@ export function CsvUpload() {
                   <TableRow key={rowIndex}>
                     {Object.values(mappedFields).map((field, cellIndex) => (
                       <TableCell key={cellIndex}>
-                        {field === "price"
-                          ? <CurrencyFormatter value={parseFloat(row[field])} />
-                          : row[field]}
+                        {field === "price" ? (
+                          <CurrencyFormatter value={parseFloat(row[field])} />
+                        ) : (
+                          row[field]
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -666,7 +717,7 @@ export function CsvUpload() {
             </Table>
           </ScrollArea>
 
-            <DialogFooter>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setShowPreview(false)}>
               Cancel
             </Button>
@@ -680,9 +731,9 @@ export function CsvUpload() {
                 "Confirm Upload"
               )}
             </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -96,6 +96,35 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 16px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Base heading styles - mobile first */
+  h1 {
+    @apply text-3xl font-bold leading-tight tracking-tight;
+  }
+  h2 {
+    @apply text-2xl font-bold leading-tight;
+  }
+  h3 {
+    @apply text-xl font-semibold leading-tight;
+  }
+  h4 {
+    @apply text-lg font-semibold leading-snug;
+  }
+  h5 {
+    @apply text-base font-medium leading-snug;
+  }
+  h6 {
+    @apply text-sm font-medium leading-normal;
+  }
+  p {
+    @apply text-base leading-relaxed;
+  }
+  a {
+    @apply outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
   }
 }
 
@@ -115,28 +144,55 @@
   animation: fadeInUp 0.6s ease-out forwards;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+/* Smooth scrolling with reduced motion preference respect */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Enhanced button styles */
 .btn {
-  @apply rounded-md shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg;
+  @apply rounded-md shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
 }
 
 /* Section styles */
 .section {
-  @apply pt-16 sm:pt-24 md:pt-32 lg:pt-40;
+  @apply py-10 sm:py-16 md:py-24 lg:py-32;
 }
 
-/* Responsive typography */
+/* Container padding */
+.container-padding {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Responsive spacing utilities */
+.mt-responsive {
+  @apply mt-6 sm:mt-8 md:mt-10 lg:mt-12;
+}
+
+.mb-responsive {
+  @apply mb-6 sm:mb-8 md:mb-10 lg:mb-12;
+}
+
+.py-responsive {
+  @apply py-6 sm:py-8 md:py-10 lg:py-12; 
+}
+
+.px-responsive {
+  @apply px-4 sm:px-6 md:px-8 lg:px-10;
+}
+
+/* Responsive typography - progressively enhance from mobile baseline */
 @screen sm {
   h1 {
     @apply text-4xl;
   }
   h2 {
     @apply text-3xl;
+  }
+  h3 {
+    @apply text-2xl;
   }
   p {
     @apply text-base;
@@ -150,6 +206,9 @@ html {
   h2 {
     @apply text-4xl;
   }
+  h3 {
+    @apply text-3xl;
+  }
   p {
     @apply text-lg;
   }
@@ -162,8 +221,85 @@ html {
   h2 {
     @apply text-5xl;
   }
+  h3 {
+    @apply text-4xl;
+  }
   p {
     @apply text-xl;
+  }
+}
+
+/* Better touch targets for mobile */
+@media (max-width: 640px) {
+  button, 
+  .btn, 
+  [role="button"],
+  a.btn,
+  input[type="submit"],
+  input[type="reset"],
+  input[type="button"] {
+    @apply py-2.5 px-4 min-h-[44px] min-w-[44px];
+  }
+  
+  nav a, 
+  .nav-link,
+  footer a {
+    @apply py-2 px-3;
+  }
+}
+
+/* Flexbox gap fallback for older browsers */
+.flex-gap {
+  @apply flex flex-wrap -m-2;
+}
+
+.flex-gap > * {
+  @apply p-2;
+}
+
+/* Grid fallback */
+@supports not (display: grid) {
+  .grid {
+    @apply flex flex-wrap;
+  }
+}
+
+/* Custom screen reader only class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Mobile navigation overlay */
+.mobile-nav-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm z-40 transition-opacity duration-300;
+}
+
+/* Define XS breakpoint for very small screens */
+@layer utilities {
+  @variants responsive {
+    .xs\:hidden {
+      display: none;
+    }
+    .xs\:block {
+      display: block;
+    }
+    .xs\:inline-block {
+      display: inline-block;
+    }
+    .xs\:inline {
+      display: inline;
+    }
+    .xs\:flex {
+      display: flex;
+    }
   }
 }
 

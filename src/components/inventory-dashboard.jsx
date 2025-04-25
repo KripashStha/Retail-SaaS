@@ -255,7 +255,7 @@ export function InventoryDashboard() {
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex justify-between">
-          <TabsList className="bg-indigo-50 rounded-md p-1">
+          <TabsList className="bg-indigo-50 rounded-md p-1 dark:bg-gray-800 dark:text-gray-300">
             <TabsTrigger value="overview">
               <BarChart3 className="mr-2 h-4 w-4" />
               Overview

@@ -1,12 +1,14 @@
 "use client";
 
+import { useTheme } from 'next-themes';
 import { useState, useEffect } from "react";
 import { db, auth } from "@/firebase/dbConfig";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, getDoc, doc } from "firebase/firestore";
+import { getDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Users, LogOut, SunMediumIcon, MoonStarIcon } from "lucide-react";
+import { LogOut, SunMediumIcon } from "lucide-react";
+import DarkModeToggle from "./DarkModeToggle";
 import {
   Popover,
   PopoverTrigger,
@@ -17,7 +19,9 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 function Profile() {
+  const { theme, setTheme } = useTheme();
   const [user, setUser] = useState("");
+  const { toggleDarkMode } = DarkModeToggle(); 
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -47,6 +51,10 @@ function Profile() {
 
     return () => unsubscribe();
   }, [router]);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   const handleSignOut = async () => {
     setIsLoading(true);
@@ -104,7 +112,7 @@ function Profile() {
             </div>
           </div>
           <div className="flex flex-col space-y-1">
-            <Button variant="ghost" className="justify-start">
+            <Button variant="ghost" className="justify-start" onClick={toggleTheme}>
               <SunMediumIcon className="h-5 w-5 mr-2"/> Toggle theme
             </Button>
             <Button 

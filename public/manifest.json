@@ -1,0 +1,16 @@
+{
+  "name": "Easy Inventory",
+  "short_name": "Easy Inventory",
+  "description": "Simplify your inventory management with Easy Inventory",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/package.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

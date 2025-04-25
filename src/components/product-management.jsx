@@ -63,6 +63,7 @@ import { CsvUpload } from "@/components/csv-upload";
 // Import the inventory context
 import { useInventory } from "@/contexts/inventory-context";
 import { CurrencyFormatter } from "@/components/currency-formatter";
+import { useCurrency } from "@/contexts/currency-context";
 
 export function InventoryTracking() {
   // Use the inventory context for real-time data
@@ -72,6 +73,9 @@ export function InventoryTracking() {
     error: inventoryError,
     businessId,
   } = useInventory();
+
+  // Add currency context
+  const { currency, convertCurrency } = useCurrency();
 
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -472,6 +476,34 @@ export function InventoryTracking() {
     }
   };
 
+  // Set up function to initialize editing product with converted currency
+  const initializeEditingProduct = (product) => {
+    // Convert USD price to the user's selected currency for editing
+    // and format to exactly 2 decimal places
+    const convertedPrice = convertCurrency(product.price, "USD", currency);
+    const formattedPrice = parseFloat(convertedPrice.toFixed(2));
+
+    return {
+      ...product,
+      displayPrice: formattedPrice,
+      originalPrice: product.price, // Store original USD value
+    };
+  };
+
+  // Initialize new product with converted currency value
+  const handleOpenAddDialog = () => {
+    setNewProduct({
+      name: "",
+      quantity: 0,
+      price: 0,
+      displayPrice: 0,
+      threshold: 0,
+      category: "",
+      barcode: "",
+    });
+    setIsDialogOpen(true);
+  };
+
   if (loading && inventoryLoading) {
     return (
       <Card>
@@ -563,7 +595,10 @@ export function InventoryTracking() {
           <div className="flex space-x-2 w-full md:w-auto justify-end">
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-indigo-600 text-white">
+                <Button
+                  className="bg-indigo-600 text-white"
+                  onClick={handleOpenAddDialog}
+                >
                   <Plus className="mr-2 h-4 w-4" /> Add Product
                 </Button>
               </DialogTrigger>
@@ -640,15 +675,23 @@ export function InventoryTracking() {
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="price" className="text-right">
-                      Price
+                      Price ({currency})
                     </Label>
                     <Input
                       id="price"
-                      name="price"
+                      name="displayPrice"
                       type="number"
-                      step="0.01"
-                      value={newProduct.price}
-                      onChange={handleInputChange}
+                      step="1"
+                      value={newProduct.displayPrice || 0}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        setNewProduct({
+                          ...newProduct,
+                          displayPrice: value,
+                          // Convert from current currency to USD for storage
+                          price: convertCurrency(value, currency, "USD"),
+                        });
+                      }}
                       className="col-span-3"
                       disabled={actionLoading.id === "new"}
                     />
@@ -810,7 +853,9 @@ export function InventoryTracking() {
                             }
                             onOpenChange={(open) => {
                               if (open) {
-                                setEditingProduct(product);
+                                setEditingProduct(
+                                  initializeEditingProduct(product)
+                                );
                               }
                               setIsEditDialogOpen(open);
                             }}
@@ -928,15 +973,29 @@ export function InventoryTracking() {
                                         htmlFor="edit-price"
                                         className="text-right"
                                       >
-                                        Price
+                                        Price ({currency})
                                       </Label>
                                       <Input
                                         id="edit-price"
-                                        name="price"
+                                        name="displayPrice"
                                         type="number"
-                                        step="0.01"
-                                        value={editingProduct.price}
-                                        onChange={handleInputChange}
+                                        step="1"
+                                        value={editingProduct.displayPrice}
+                                        onChange={(e) => {
+                                          const value = parseFloat(
+                                            e.target.value
+                                          );
+                                          setEditingProduct({
+                                            ...editingProduct,
+                                            displayPrice: value,
+                                            // Convert back to USD to store in the 'price' field
+                                            price: convertCurrency(
+                                              value,
+                                              currency,
+                                              "USD"
+                                            ),
+                                          });
+                                        }}
                                         className="col-span-3"
                                         disabled={
                                           actionLoading.id === product.id

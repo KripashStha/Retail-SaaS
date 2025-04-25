@@ -80,7 +80,7 @@ export function PointOfSale() {
   const videoRef = useRef(null);
   const [isScannerReady, setIsScannerReady] = useState(false);
   const codeReader = useRef(new BrowserMultiFormatReader());
-  const { currency, getCurrencySymbol } = useCurrency();
+  const { currency, getCurrencySymbol, convertCurrency } = useCurrency();
 
   // Get products and businessId from inventory context
   const { products, loading, error, businessId, searchProducts } =
@@ -895,7 +895,7 @@ export function PointOfSale() {
                       max={
                         discountType === "percentage"
                           ? 100
-                          : calculateTotals.subtotal
+                          : convertCurrency(calculateTotals.subtotal, "USD", currency).toFixed(2)
                       }
                       value={discountValue}
                       onChange={(e) =>
@@ -904,7 +904,7 @@ export function PointOfSale() {
                             parseFloat(e.target.value) || 0,
                             discountType === "percentage"
                               ? 100
-                              : calculateTotals.subtotal
+                              : convertCurrency(calculateTotals.subtotal, "USD", currency).toFixed(2)
                           )
                         )
                       }
