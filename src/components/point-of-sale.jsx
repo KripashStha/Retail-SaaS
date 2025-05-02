@@ -413,7 +413,7 @@ export function PointOfSale() {
     }
   };
 
-  // Generate receipt with enhanced formatting
+  // Generate receipt with enhanced formatting and currency conversion
   const generateReceipt = async (saleId, saleData) => {
     const receiptWindow = window.open("", "_blank");
 
@@ -455,7 +455,7 @@ export function PointOfSale() {
             .total-line { display: flex; justify-content: space-between; }
             .grand-total { font-weight: bold; font-size: 1.2em; }
             .footer { text-align: center; margin-top: 20px; font-size: 0.9em; }
-            .print-button { 
+                        .print-button { 
               display: block; 
               margin: 20px auto; 
               padding: 10px 20px; 
@@ -487,7 +487,9 @@ export function PointOfSale() {
                     ${item.name} x ${item.quantity}
                   </div>
                   <div class="item-price">
-                    $${(item.price * item.quantity).toFixed(2)}
+                    ${getCurrencySymbol()}${convertCurrency(
+                    item.price * item.quantity
+                  ).toFixed(2)}
                   </div>
                 </div>
               `
@@ -500,7 +502,9 @@ export function PointOfSale() {
             <div class="totals">
               <div class="total-line">
                 <span>Subtotal:</span>
-                <span>$${saleData.subtotal.toFixed(2)}</span>
+                <span>${getCurrencySymbol()}${convertCurrency(
+      saleData.subtotal
+    ).toFixed(2)}</span>
               </div>
               
               ${
@@ -512,7 +516,9 @@ export function PointOfSale() {
                     ? saleData.discountValue + "%"
                     : "Fixed"
                 }):</span>
-                <span>-$${saleData.discount.toFixed(2)}</span>
+                <span>-${getCurrencySymbol()}${convertCurrency(
+                      saleData.discount
+                    ).toFixed(2)}</span>
               </div>
               `
                   : ""
@@ -520,15 +526,19 @@ export function PointOfSale() {
               
               <div class="total-line">
                 <span>Tax:</span>
-                <span>$${saleData.tax.toFixed(2)}</span>
+                <span>${getCurrencySymbol()}${convertCurrency(
+      saleData.tax
+    ).toFixed(2)}</span>
               </div>
               
               <div class="total-line grand-total">
                 <span>Total:</span>
-                <span>$${saleData.total.toFixed(2)}</span>
+                <span>${getCurrencySymbol()}${convertCurrency(
+      saleData.total
+    ).toFixed(2)}</span>
               </div>
             </div>
-            
+                        
             <div class="divider"></div>
             
             <div class="footer">
@@ -687,7 +697,7 @@ export function PointOfSale() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-2 sm:px-4 max-w-full">
       {/* Left side - Product Search and Scanner */}
       <Card>
         <CardHeader>
@@ -695,12 +705,17 @@ export function PointOfSale() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 placeholder="Search products..."
                 onChange={handleSearchChange}
+                className="w-full"
               />
-              <Button onClick={handleScannerClick} disabled={isInitializing}>
+              <Button
+                onClick={handleScannerClick}
+                disabled={isInitializing}
+                className="w-full sm:w-auto"
+              >
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
@@ -755,114 +770,125 @@ export function PointOfSale() {
             </Dialog>
 
             {/* Product List */}
-            <div className="h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.length > 0 ? (
-                    filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell>
-                          <CurrencyFormatter value={product.price || 0} />
-                        </TableCell>
-                        <TableCell>
-                          {product.quantity <= 0 ? (
-                            <span className="text-red-500 flex items-center">
-                              <AlertCircle className="h-3 w-3 mr-1" /> Out of
-                              stock
-                            </span>
-                          ) : product.quantity < 5 ? (
-                            <span className="text-amber-500">
-                              {product.quantity} left
-                            </span>
-                          ) : (
-                            product.quantity
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addToCart(product)}
-                            disabled={product.quantity <= 0}
-                          >
-                            Add
-                          </Button>
+            <div className="overflow-x-auto rounded-md border">
+              <div className="h-[700px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Stock</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.length > 0 ? (
+                      filteredProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>{product.name}</TableCell>
+                          <TableCell>
+                            <CurrencyFormatter value={product.price || 0} />
+                          </TableCell>
+                          <TableCell>
+                            {product.quantity <= 0 ? (
+                              <span className="text-red-500 flex items-center">
+                                <AlertCircle className="h-3 w-3 mr-1" /> Out of
+                                stock
+                              </span>
+                            ) : product.quantity < 5 ? (
+                              <span className="text-amber-500">
+                                {product.quantity} left
+                              </span>
+                            ) : (
+                              product.quantity
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addToCart(product)}
+                              disabled={product.quantity <= 0}
+                            >
+                              Add
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-4">
+                          {searchTerm
+                            ? "No products match your search."
+                            : "No products available."}
                         </TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4">
-                        {searchTerm
-                          ? "No products match your search."
-                          : "No products available."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Right side - Cart */}
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Shopping Cart</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {cart.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cart.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateQuantity(item.id, parseInt(e.target.value))
-                          }
-                          className="w-20"
-                          min="1"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <CurrencyFormatter value={item.price * item.quantity} />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromCart(item.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto rounded-md border">
+                <div className="min-w-[400px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cart.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.name}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                updateQuantity(
+                                  item.id,
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-20"
+                              min="1"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <CurrencyFormatter
+                              value={item.price * item.quantity}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <ShoppingCart className="h-12 w-12 mb-2" />
@@ -874,9 +900,12 @@ export function PointOfSale() {
             {cart.length > 0 && (
               <div className="pt-4 border-t">
                 <Label htmlFor="discount-type">Apply Discount</Label>
-                <div className="flex gap-2 mt-1">
+                <div className="flex flex-col sm:flex-row gap-2 mt-1">
                   <Select value={discountType} onValueChange={setDiscountType}>
-                    <SelectTrigger id="discount-type" className="w-[150px]">
+                    <SelectTrigger
+                      id="discount-type"
+                      className="w-full sm:w-[150px]"
+                    >
                       <SelectValue placeholder="Discount Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -895,7 +924,11 @@ export function PointOfSale() {
                       max={
                         discountType === "percentage"
                           ? 100
-                          : convertCurrency(calculateTotals.subtotal, "USD", currency).toFixed(2)
+                          : convertCurrency(
+                              calculateTotals.subtotal,
+                              "USD",
+                              currency
+                            ).toFixed(2)
                       }
                       value={discountValue}
                       onChange={(e) =>
@@ -904,11 +937,15 @@ export function PointOfSale() {
                             parseFloat(e.target.value) || 0,
                             discountType === "percentage"
                               ? 100
-                              : convertCurrency(calculateTotals.subtotal, "USD", currency).toFixed(2)
+                              : convertCurrency(
+                                  calculateTotals.subtotal,
+                                  "USD",
+                                  currency
+                                ).toFixed(2)
                           )
                         )
                       }
-                      className="w-24"
+                      className="w-full sm:w-24"
                       placeholder={
                         discountType === "percentage"
                           ? "%"
@@ -922,7 +959,7 @@ export function PointOfSale() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-end gap-4">
-          <div className="text-right mt-4">
+          <div className="text-right mt-4 w-full">
             <p>
               Subtotal: <CurrencyFormatter value={calculateTotals.subtotal} />
             </p>
@@ -939,17 +976,19 @@ export function PointOfSale() {
               Total: <CurrencyFormatter value={calculateTotals.total} />
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full">
             <Button
               variant="outline"
               onClick={() => setCart([])}
               disabled={cart.length === 0}
+              className="w-full sm:w-auto"
             >
               Clear Cart
             </Button>
             <Button
               onClick={processSale}
               disabled={cart.length === 0 || isProcessing}
+              className="w-full sm:w-auto"
             >
               {isProcessing ? "Processing..." : "Process Sale"}
             </Button>

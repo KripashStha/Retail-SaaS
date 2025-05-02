@@ -259,7 +259,7 @@ export function NotificationSystem() {
           </TabsList>
           
           <TabsContent value="all">
-            <ScrollArea className="h-[630px]">
+            <ScrollArea className="h-[680px]">
               {loading ? (
                 <div className="flex justify-center items-center h-40">
                   <p>Loading notifications...</p>
@@ -315,7 +315,7 @@ export function NotificationSystem() {
           </TabsContent>
           
           <TabsContent value="unread">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[680px]">
               {loading ? (
                 <div className="flex justify-center items-center h-40">
                   <p>Loading notifications...</p>

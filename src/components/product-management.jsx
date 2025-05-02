@@ -202,6 +202,14 @@ export function InventoryTracking() {
         throw new Error(result.error || "Failed to update product");
       }
 
+      // Check if initial quantity is below threshold
+      if (shouldNotifyLowStock(updateData)) {
+        await createLowStockNotification(
+          { id: result.id, ...updateData },
+          businessId
+        );
+      }      
+
       toast({
         title: "Success",
         description: result.message || "Product updated successfully",

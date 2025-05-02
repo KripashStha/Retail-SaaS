@@ -229,9 +229,17 @@ export default function Employee() {
   const getStatusBadge = (status) => {
     switch (status) {
       case "pending_invite":
-        return <Badge variant="secondary" className="text-red-500 bg-red-50">Pending</Badge>;
+        return (
+          <Badge variant="secondary" className="text-red-500 bg-red-50">
+            Pending
+          </Badge>
+        );
       case "active":
-        return <Badge variant="success" className="text-green-500 bg-green-50">Accepted</Badge>;
+        return (
+          <Badge variant="success" className="text-green-500 bg-green-50">
+            Accepted
+          </Badge>
+        );
       case "expired":
         return <Badge variant="warning">Expired</Badge>;
       default:
@@ -288,20 +296,20 @@ export default function Employee() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <Input
             type="text"
             placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
+            className="pl-8 w-full sm:w-64"
           />
         </div>
         <Dialog>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 text-white">
+            <Button className="bg-indigo-600 text-white w-full sm:w-auto mt-2 sm:mt-0">
               <Plus className="mr-2 h-4 w-4" /> Invite Employees
             </Button>
           </DialogTrigger>
@@ -314,52 +322,54 @@ export default function Employee() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.length === 0 ? (
+      <div className="rounded-md border overflow-x-auto">
+        <div className="min-w-[600px]">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-center text-gray-400 py-28"
-                >
-                  No employees or pending invitations found.
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.userName}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>{getStatusBadge(user.status)}</TableCell>
-                  <TableCell>
-                    {user.status === "pending_invite" ? (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleCancelInvitation(user.id)}
-                      >
-                        Cancel Invitation
-                      </Button>
-                    ) : (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-36 p-2 ">
-                          
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-gray-400 py-28"
+                  >
+                    No employees or pending invitations found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.userName}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.role}</TableCell>
+                    <TableCell>{getStatusBadge(user.status)}</TableCell>
+                    <TableCell>
+                      {user.status === "pending_invite" ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancelInvitation(user.id)}
+                        >
+                          Cancel Invitation
+                        </Button>
+                      ) : (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-36 p-2 ">
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button
@@ -444,16 +454,16 @@ export default function Employee() {
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
-                        
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

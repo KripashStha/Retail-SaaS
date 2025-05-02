@@ -252,7 +252,7 @@ export function InventoryDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex justify-between">
           <TabsList className="bg-indigo-50 rounded-md p-1 dark:bg-gray-800 dark:text-gray-300">
@@ -264,8 +264,8 @@ export function InventoryDashboard() {
               <Layers className="mr-2 h-4 w-4" />
               Inventory Health
             </TabsTrigger>
-            {/* <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
-            <TabsTrigger value="recommendations">Insights</TabsTrigger> */}
+            <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
+            <TabsTrigger value="recommendations">Insights</TabsTrigger>
           </TabsList>
 
           {/* <div className="flex gap-2">
@@ -295,7 +295,7 @@ export function InventoryDashboard() {
 
         <TabsContent value="overview" className="mt-4">
           {/* Overview tab content */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {/* KPI Metrics */}
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 rounded-md"></div>
@@ -391,9 +391,9 @@ export function InventoryDashboard() {
           </div>
 
           {/* Second Row - Charts */}
-          <div className="grid gap-4 md:grid-cols-7 mt-4">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-7 mt-4">
             {/* Sales Trend Chart */}
-            <Card className="col-span-4">
+            <Card className="col-span-1 lg:col-span-4">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-indigo-600" />
@@ -461,7 +461,7 @@ export function InventoryDashboard() {
             </Card>
 
             {/* Category & Stock Distribution */}
-            <Card className="col-span-3">
+            <Card className="col-span-1 lg:col-span-3">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChart className="h-5 w-5 text-indigo-600" />
@@ -582,7 +582,7 @@ export function InventoryDashboard() {
           </div>
 
           {/* Third Row - Top Products and Recent Activity */}
-          <div className="grid gap-4 md:grid-cols-2 mt-4">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 mt-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
@@ -718,7 +718,7 @@ export function InventoryDashboard() {
 
         <TabsContent value="inventory">
           {/* Inventory Health tab content */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
