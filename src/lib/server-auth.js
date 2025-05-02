@@ -1,0 +1,94 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+
+// Initialize Firebase Admin if it hasn't been initialized already
+const getFirebaseAdminApp = () => {
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
+
+  const FIREBASE_ADMIN_CONFIG = {
+    projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  };
+
+  try {
+    // Check if any of the required config values are missing
+    if (!FIREBASE_ADMIN_CONFIG.projectId || 
+        !FIREBASE_ADMIN_CONFIG.clientEmail || 
+        !FIREBASE_ADMIN_CONFIG.privateKey) {
+      console.error('Missing Firebase Admin configuration. Check your environment variables.');
+      throw new Error('Missing Firebase Admin configuration');
+    }
+    
+    return initializeApp({
+      credential: cert(FIREBASE_ADMIN_CONFIG),
+    });
+  } catch (error) {
+    console.error('Firebase admin initialization error:', error);
+    throw error;
+  }
+};
+
+// Initialize the app and services
+const app = getFirebaseAdminApp();
+const adminDb = getFirestore(app);
+const adminAuth = getAuth(app);
+
+export async function getServerSession() {
+  try {
+    const cookieStore = cookies();
+    const sessionCookie = cookieStore.get('session')?.value;
+    
+    if (!sessionCookie) {
+      return null;
+    }
+    
+    // Verify the session cookie and get the user
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+    return decodedClaims;
+  } catch (error) {
+    console.error('Error verifying session cookie:', error);
+    return null;
+  }
+}
+
+export async function getBusinessData(userId) {
+  if (!userId) return null;
+  
+  try {
+    const userRef = adminDb.collection('Users').doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      return null;
+    }
+    
+    const userData = userDoc.data();
+    const businessRef = adminDb.collection('businesses').doc(userData.businessId);
+    const businessDoc = await businessRef.get();
+    
+    if (!businessDoc.exists) {
+      return null;
+    }
+    
+    return businessDoc.data();
+  } catch (error) {
+    console.error('Error fetching business data:', error);
+    return null;
+  }
+}
+
+export async function requireAuth() {
+  const session = await getServerSession();
+  
+  if (!session) {
+    redirect('/login');
+  }
+  
+  return session.uid;
+}
