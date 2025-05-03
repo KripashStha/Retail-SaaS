@@ -254,3 +254,6 @@ export default function SignUp() {
     </div>
   );
 }
+
+// Mark this route as dynamic
+export const dynamic = 'force-dynamic';
