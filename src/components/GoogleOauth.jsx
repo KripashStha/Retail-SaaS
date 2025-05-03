@@ -17,15 +17,42 @@ function GoogleOauth() {
     setIsLoading(true);
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
-    
+
     // Configure auth provider
     provider.setCustomParameters({
-      prompt: 'select_account'
+      prompt: "select_account",
     });
 
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+
+      // Get ID token for session creation
+      const idToken = await user.getIdToken();
+
+      // Create server-side session
+      try {
+        const sessionResponse = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ idToken }),
+        });
+
+        if (!sessionResponse.ok) {
+          throw new Error("Failed to create session");
+        }
+      } catch (sessionError) {
+        console.error("Failed to create session:", sessionError);
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Failed to create session. Please try again.",
+        });
+        setIsLoading(false);
+        return;
+      }
 
       // Check if user exists in Firestore
       const userDoc = await getDoc(doc(db, "Users", user.uid));
@@ -33,23 +60,24 @@ function GoogleOauth() {
       if (!userDoc.exists()) {
         router.push("/business-setup");
       } else {
-        router.push("/admin");
+        router.push("/admin/dashboard");
       }
     } catch (error) {
       console.error("Error signing in with Google:", error);
       let errorMessage = "Failed to sign in with Google";
-      
+
       // Handle specific error cases
-      if (error.code === 'auth/popup-closed-by-user') {
+      if (error.code === "auth/popup-closed-by-user") {
         errorMessage = "Sign-in popup was closed before completing";
-      } else if (error.code === 'auth/popup-blocked') {
-        errorMessage = "Sign-in popup was blocked by the browser. Please allow popups for this site.";
+      } else if (error.code === "auth/popup-blocked") {
+        errorMessage =
+          "Sign-in popup was blocked by the browser. Please allow popups for this site.";
       }
 
       toast({
         variant: "destructive",
         title: "Authentication Error",
-        description: errorMessage
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -58,17 +86,33 @@ function GoogleOauth() {
 
   return (
     <div className="flex space-x-3 w-full">
-      <Button 
-        onClick={handleGoogleSignIn} 
-        variant="outline" 
+      <Button
+        onClick={handleGoogleSignIn}
+        variant="outline"
         className="w-full"
         disabled={isLoading}
       >
         {isLoading ? (
           <span className="flex items-center">
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <svg
+              className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
             </svg>
             Signing in...
           </span>

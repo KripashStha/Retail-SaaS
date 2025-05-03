@@ -5,7 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
 // Initialize Firebase Admin if it hasn't been initialized already
-const getFirebaseAdminApp = () => {
+export const getFirebaseAdminApp = () => {
   if (getApps().length > 0) {
     return getApps()[0];
   }
@@ -41,7 +41,7 @@ const adminAuth = getAuth(app);
 
 export async function getServerSession() {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('session')?.value;
     
     if (!sessionCookie) {
@@ -55,6 +55,39 @@ export async function getServerSession() {
     console.error('Error verifying session cookie:', error);
     return null;
   }
+}
+
+// Helper function to serialize timestamps and other complex objects
+function serializeData(data) {
+  if (!data) return null;
+  
+  const serialized = {};
+  
+  Object.keys(data).forEach(key => {
+    const value = data[key];
+    
+    // Handle Firestore Timestamps
+    if (value && typeof value === 'object' && value._seconds !== undefined && value._nanoseconds !== undefined) {
+      // Convert to ISO string format
+      serialized[key] = new Date(value._seconds * 1000).toISOString();
+    } 
+    // Handle nested objects
+    else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      serialized[key] = serializeData(value);
+    } 
+    // Handle arrays
+    else if (Array.isArray(value)) {
+      serialized[key] = value.map(item => 
+        typeof item === 'object' && item !== null ? serializeData(item) : item
+      );
+    } 
+    // Handle simple values
+    else {
+      serialized[key] = value;
+    }
+  });
+  
+  return serialized;
 }
 
 export async function getBusinessData(userId) {
@@ -76,7 +109,8 @@ export async function getBusinessData(userId) {
       return null;
     }
     
-    return businessDoc.data();
+    // Serialize the business data before returning
+    return serializeData(businessDoc.data());
   } catch (error) {
     console.error('Error fetching business data:', error);
     return null;

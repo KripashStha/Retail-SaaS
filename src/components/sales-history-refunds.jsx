@@ -683,12 +683,22 @@ export function SalesHistoryRefunds() {
                                 onClick={() => handleRefund(transaction)}
                                 // Disable the refund button if the transaction is fully refunded
                                 disabled={
-                                  transaction.refundedItems 
-                                    ? transaction.items.every(item => {
-                                        const refundedQuantity = (transaction.refundedItems || [])
-                                          .filter(refund => refund.id === item.id)
-                                          .reduce((total, refund) => total + refund.quantity, 0);
-                                        return refundedQuantity >= item.quantity;
+                                  transaction.refundedItems
+                                    ? transaction.items.every((item) => {
+                                        const refundedQuantity = (
+                                          transaction.refundedItems || []
+                                        )
+                                          .filter(
+                                            (refund) => refund.id === item.id
+                                          )
+                                          .reduce(
+                                            (total, refund) =>
+                                              total + refund.quantity,
+                                            0
+                                          );
+                                        return (
+                                          refundedQuantity >= item.quantity
+                                        );
                                       })
                                     : false
                                 }
@@ -1017,10 +1027,15 @@ export function SalesHistoryRefunds() {
                   }}
                   disabled={
                     selectedTransaction.refundedItems
-                      ? selectedTransaction.items.every(item => {
-                          const refundedQuantity = (selectedTransaction.refundedItems || [])
-                            .filter(refund => refund.id === item.id)
-                            .reduce((total, refund) => total + refund.quantity, 0);
+                      ? selectedTransaction.items.every((item) => {
+                          const refundedQuantity = (
+                            selectedTransaction.refundedItems || []
+                          )
+                            .filter((refund) => refund.id === item.id)
+                            .reduce(
+                              (total, refund) => total + refund.quantity,
+                              0
+                            );
                           return refundedQuantity >= item.quantity;
                         })
                       : false

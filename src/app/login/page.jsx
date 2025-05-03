@@ -36,10 +36,15 @@ export default function Login() {
     if (validateForm()) {
       setIsLoading(true);
       try {
-        await signInWithEmailAndPassword(auth, email, password);
-        const user = auth.currentUser;
+        // Step 1: Authenticate with Firebase
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        const user = userCredential.user;
 
-        // Fetch user role from Firestore
+        // Step 2: Fetch user role from Firestore
         const userDoc = await getDoc(doc(db, "Users", user.uid));
         const userData = userDoc.data();
 
@@ -53,11 +58,39 @@ export default function Login() {
           return;
         }
 
-        router.push("/admin");
-        toast({
-          title: "Success",
-          description: "Successfully logged in",
-        });
+        // Step 3: Create a server-side session
+        try {
+          // Get the ID token from Firebase
+          const idToken = await user.getIdToken();
+
+          // Call our API to create a session cookie
+          const response = await fetch("/api/auth/session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ idToken }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to create session");
+          }
+
+          // Now navigate to dashboard
+          router.push("/admin/dashboard");
+
+          toast({
+            title: "Success",
+            description: "Successfully logged in",
+          });
+        } catch (sessionError) {
+          console.error("Failed to create session:", sessionError);
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "Failed to create session. Please try again.",
+          });
+        }
       } catch (error) {
         console.error("Login failed", error.message);
         let errorMessage = "";

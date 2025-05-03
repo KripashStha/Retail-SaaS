@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from 'next-themes';
+import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import { db, auth } from "@/firebase/dbConfig";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -8,7 +8,6 @@ import { getDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, SunMediumIcon } from "lucide-react";
-import DarkModeToggle from "./DarkModeToggle";
 import {
   Popover,
   PopoverTrigger,
@@ -21,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 function Profile() {
   const { theme, setTheme } = useTheme();
   const [user, setUser] = useState("");
-  const { toggleDarkMode } = DarkModeToggle(); 
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -44,23 +42,47 @@ function Profile() {
           });
         }
       } else {
-        // User is signed out, redirect to login
-        router.push("/login");
+        // User is signed out
+        // No auto-redirection here - we'll handle it explicitly in handleSignOut
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [toast]);
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   const handleSignOut = async () => {
     setIsLoading(true);
     try {
+      // First, sign out from Firebase client-side
       await signOut(auth);
-      router.push("/login");
+
+      // Then call our server API to clear the session cookie
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to logout on server");
+      }
+
+      // Clear any local storage items if needed
+      localStorage.removeItem("user");
+
+      // Add a delay to ensure cookies are properly processed
+      setTimeout(() => {
+        // Use window.location for a full page refresh to clear all state
+        window.location.href = "/login";
+      }, 100);
     } catch (error) {
       console.error("Error signing out:", error);
       toast({
@@ -68,11 +90,11 @@ function Profile() {
         title: "Error",
         description: "Failed to sign out. Please try again.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
 
+  // Rest of component remains the same
   return (
     <div>
       <Popover>
@@ -82,8 +104,8 @@ function Profile() {
               <AvatarImage />
               <AvatarFallback className="bg-pink-500 text-white">
                 {user
-                  ? `${user.userName.split(" ")[0]?.charAt(0)}${
-                      user.userName.split(" ")[1]?.charAt(0)
+                  ? `${user.userName?.split(" ")[0]?.charAt(0) || ""}${
+                      user.userName?.split(" ")[1]?.charAt(0) || ""
                     }`
                   : ""}
               </AvatarFallback>
@@ -98,8 +120,8 @@ function Profile() {
               <AvatarImage />
               <AvatarFallback className="bg-pink-500 text-white">
                 {user
-                  ? `${user.userName.split(" ")[0]?.charAt(0)}${
-                      user.userName.split(" ")[1]?.charAt(0)
+                  ? `${user.userName?.split(" ")[0]?.charAt(0) || ""}${
+                      user.userName?.split(" ")[1]?.charAt(0) || ""
                     }`
                   : ""}
               </AvatarFallback>
@@ -112,16 +134,20 @@ function Profile() {
             </div>
           </div>
           <div className="flex flex-col space-y-1">
-            <Button variant="ghost" className="justify-start" onClick={toggleTheme}>
-              <SunMediumIcon className="h-5 w-5 mr-2"/> Toggle theme
+            <Button
+              variant="ghost"
+              className="justify-start"
+              onClick={toggleTheme}
+            >
+              <SunMediumIcon className="h-5 w-5 mr-2" /> Toggle theme
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="justify-start text-red-500"
               onClick={handleSignOut}
               disabled={isLoading}
             >
-              <LogOut className="h-4 w-4 mr-2"/> 
+              <LogOut className="h-4 w-4 mr-2" />
               {isLoading ? "Signing out..." : "Sign out"}
             </Button>
           </div>
