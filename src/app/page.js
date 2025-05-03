@@ -10,7 +10,6 @@ import FAQ from '../components/FAQ';
 import Footer from '../components/Footer';
 import CTA from '@/components/CTA';
 
-
 export default async function HomePage() {
   // Check if user is already authenticated on the server
   const session = await getServerSession();

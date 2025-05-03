@@ -12,6 +12,7 @@ const inter = Inter({
 })
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://www.easyinventory.tech'),
   title: 'Easy Inventory',
   description: 'Simplify your inventory management with Easy Inventory - the complete solution for retail stores. Track stock, integrate with POS systems, and make data-driven decisions.',
   keywords: 'inventory management, retail software, stock management, POS system, inventory tracking, small business, retail store management',

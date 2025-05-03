@@ -10,10 +10,22 @@ export const getFirebaseAdminApp = () => {
     return getApps()[0];
   }
 
+  // Check for environment variables and provide more detailed error logging
+  const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  // Log environment variable availability (without exposing sensitive values)
+  console.log('Firebase Admin Config Check:', {
+    projectId: projectId ? '✓ Available' : '✗ Missing',
+    clientEmail: clientEmail ? '✓ Available' : '✗ Missing',
+    privateKey: privateKey ? '✓ Available' : '✗ Missing'
+  });
+
   const FIREBASE_ADMIN_CONFIG = {
-    projectId: process.env.NEXT_PUBLIC_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    projectId,
+    clientEmail,
+    privateKey,
   };
 
   try {
@@ -30,6 +42,10 @@ export const getFirebaseAdminApp = () => {
     });
   } catch (error) {
     console.error('Firebase admin initialization error:', error);
+    // Add more detailed error information without exposing sensitive data
+    if (error.message?.includes('private_key')) {
+      console.error('Firebase private key appears to be invalid. Check your FIREBASE_ADMIN_PRIVATE_KEY format.');
+    }
     throw error;
   }
 };

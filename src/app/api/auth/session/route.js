@@ -28,22 +28,30 @@ export async function POST(request) {
     
     // Set the session cookie in the response
     const cookieStore = await cookies();
+    
+    // Get the protocol and host from the request
+    const url = request.url || '';
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     cookieStore.set('session', sessionCookie, {
       maxAge: SESSION_EXPIRES_IN,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
       path: '/',
-      sameSite: 'lax',
+      sameSite: 'lax', // Use 'none' if your frontend and API are on different domains
+      // Don't set domain to let the browser set it automatically based on the current domain
     });
+    
+    console.log('Cookie set successfully in', isProduction ? 'production' : 'development');
     
     return NextResponse.json(
       { success: true },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error creating session:', error);
+    console.error('Error creating session:', error.message);
     return NextResponse.json(
-      { error: 'Failed to create session' },
+      { error: 'Failed to create session: ' + error.message },
       { status: 401 }
     );
   }

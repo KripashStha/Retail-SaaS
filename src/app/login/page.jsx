@@ -290,6 +290,3 @@ export default function Login() {
     </div>
   );
 }
-
-// Mark this route as dynamic
-export const dynamic = 'force-dynamic';
