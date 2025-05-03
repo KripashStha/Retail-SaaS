@@ -207,8 +207,7 @@ export function NotificationSystem() {
         return <PlusCircle className="h-4 w-4 text-green-500" />;
       case 'bulk_update':
         return <Database className="h-4 w-4 text-purple-500" />;
-      case 'sale':
-        return <Bell className="h-4 w-4 text-indigo-500" />;
+      // Sale notification case has been removed
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -369,4 +368,4 @@ export function NotificationSystem() {
       </CardContent>
     </Card>
   );
-} 
+}

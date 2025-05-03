@@ -3,7 +3,7 @@ import { PageTitle } from "@/components/page-title";
 import { requireAuth, getBusinessData } from "@/lib/server-auth";
 
 // Force dynamic rendering for this layout and all its child routes
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }) {
   // Handle authentication on the server

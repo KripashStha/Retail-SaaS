@@ -48,11 +48,43 @@ export function InventoryProvider({ children }) {
     
     // If it's a string, try to parse it
     if (typeof timestamp === 'string') {
-      return new Date(timestamp);
+      try {
+        return new Date(timestamp);
+      } catch (e) {
+        console.error("Failed to parse timestamp string:", timestamp, e);
+        return null;
+      }
     }
     
     // Default case, return null
+    console.warn("Unknown timestamp format:", timestamp);
     return null;
+  };
+
+  // Function to safely stringify products for comparison
+  const safeProductsToString = (products) => {
+    if (!products || !Array.isArray(products)) return "[]";
+    
+    try {
+      // Create a simplified version of products for comparison
+      // that avoids issues with date objects
+      const simplifiedProducts = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: typeof p.price === 'number' ? p.price.toFixed(2) : p.price,
+        quantity: p.quantity,
+        threshold: p.threshold,
+        category: p.category,
+        barcode: p.barcode,
+        businessId: p.businessId,
+        // Skip timestamps for comparison to avoid false negatives
+      }));
+      
+      return JSON.stringify(simplifiedProducts);
+    } catch (err) {
+      console.error("Error stringifying products:", err);
+      return "[]";
+    }
   };
 
   // Listen for authentication state
@@ -110,10 +142,23 @@ export function InventoryProvider({ children }) {
         setBusinessId(id);
         
         // Set up real-time listener for products
-        const productsQuery = query(
-          collection(db, "products"),
-          where("businessId", "==", id)
-        );
+        // Note: We're using the try/catch without the orderBy to account for possible missing indices
+        let productsQuery;
+        try {
+          productsQuery = query(
+            collection(db, "products"),
+            where("businessId", "==", id)
+          );
+          
+          // We'll sort in-memory if needed rather than rely on Firestore orderBy
+          // which can fail if there's no index
+        } catch (queryError) {
+          console.error("Error creating products query:", queryError);
+          productsQuery = query(
+            collection(db, "products"),
+            where("businessId", "==", id)
+          );
+        }
         
         console.log("Setting up products listener for business:", id);
         
@@ -121,27 +166,90 @@ export function InventoryProvider({ children }) {
           productsQuery,
           (snapshot) => {
             try {
+              console.log("Products snapshot received, changes:", snapshot.docChanges().length);
+              
+              // Process document changes
+              if (snapshot.docChanges().length > 0) {
+                snapshot.docChanges().forEach(change => {
+                  const changeType = change.type;
+                  const docData = change.doc.data();
+                  console.log(`Document ${change.doc.id} ${changeType}:`, 
+                    docData.name, 
+                    docData.quantity, 
+                    docData.updatedAt);
+                });
+              }
+              
+              // Process all products
               const productsData = snapshot.docs.map((doc) => {
                 const data = doc.data();
-                // Safely convert timestamps
+                
+                // Parse numeric fields explicitly to ensure correct types
+                // This is important for quantity comparisons
                 return {
                   id: doc.id,
-                  ...data,
+                  name: data.name || '',
+                  price: typeof data.price === 'number' ? data.price : parseFloat(data.price || 0),
+                  quantity: typeof data.quantity === 'number' ? data.quantity : parseInt(data.quantity || 0, 10),
+                  threshold: typeof data.threshold === 'number' ? data.threshold : parseInt(data.threshold || 0, 10),
+                  category: data.category || '',
+                  barcode: data.barcode || '',
+                  businessId: data.businessId,
+                  // Handle timestamps properly
                   createdAt: safelyConvertTimestamp(data.createdAt),
                   updatedAt: safelyConvertTimestamp(data.updatedAt),
                   lastSold: safelyConvertTimestamp(data.lastSold),
                 };
               });
               
-              setProducts(productsData);
+              // Store the original timestamps for display purposes
+              // Sort products by creation date (newest first)
+              productsData.sort((a, b) => {
+                // Primary sort by creation date (newest first)
+                if (a.createdAt && b.createdAt) {
+                  return b.createdAt - a.createdAt;
+                }
+                
+                // If createdAt is missing for either product, use updatedAt as fallback
+                if (a.updatedAt && b.updatedAt) {
+                  return b.updatedAt - a.updatedAt;
+                }
+                
+                // Fall back to category and name if no timestamps available
+                if (a.category !== b.category) {
+                  return a.category.localeCompare(b.category);
+                }
+                
+                return a.name.localeCompare(b.name);
+              });
+              
+              console.log("Processed product data:", productsData.length);
+              
+              // Use functional update to ensure we're working with the latest state
+              setProducts(currentProducts => {
+                // Compare if anything actually changed to prevent unnecessary rerenders
+                const currentString = safeProductsToString(currentProducts);
+                const newString = safeProductsToString(productsData);
+                
+                if (currentString !== newString) {
+                  console.log("Products data has changed, updating state");
+                  return productsData;
+                }
+                
+                console.log("Products unchanged, maintaining current state");
+                return currentProducts;
+              });
+              
               setLoading(false);
               setInitialized(true);
             } catch (err) {
-              setError("Failed to process product data");
+              console.error("Error processing product data:", err);
+              setError("Failed to process product data: " + err.message);
               setLoading(false);
             }
           },
           (err) => {
+            console.error("Firestore listener error:", err);
             setError("Failed to load inventory data");
             setLoading(false);
             toast({
@@ -152,6 +260,7 @@ export function InventoryProvider({ children }) {
           }
         );
       } catch (err) {
+        console.error("Error fetching business data:", err);
         setError("Failed to load business data");
         setLoading(false);
       }
@@ -170,7 +279,7 @@ export function InventoryProvider({ children }) {
         unsubscribeProducts();
       }
     };
-  }, [currentUser]);
+  }, [currentUser, toast]);
 
   // Get a single product by ID (with real-time updates)
   const getProduct = (productId) => {
@@ -230,4 +339,4 @@ export const useInventory = () => {
     throw new Error("useInventory must be used within an InventoryProvider");
   }
   return context;
-}; 
+};

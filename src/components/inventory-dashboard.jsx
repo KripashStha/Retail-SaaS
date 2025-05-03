@@ -39,7 +39,9 @@ import {
   XCircle,
   Tag,
   Calendar,
-  History,
+  Plus,
+  Edit,
+  ShoppingCart,
 } from "lucide-react";
 import { useInventory } from "@/contexts/inventory-context";
 import { CurrencyFormatter } from "@/components/currency-formatter";
@@ -49,6 +51,96 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useCurrency } from "@/contexts/currency-context";
 import { format, subDays } from "date-fns";
+import { collection, query, orderBy, limit, getDocs, where } from "firebase/firestore";
+import { db } from "@/firebase/dbConfig";
+
+// Format timestamp to readable format
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "Unknown date";
+  
+  // Try to convert to a Date object if it's not already
+  let date;
+  
+  try {
+    // Handle Firestore timestamp objects
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      date = timestamp.toDate();
+    }
+    // Handle JS Date objects
+    else if (timestamp instanceof Date) {
+      date = timestamp;
+    }
+    // Handle timestamp numbers (milliseconds since epoch)
+    else if (typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    }
+    // Handle timestamp objects with seconds and nanoseconds
+    else if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
+      date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+    }
+    // Handle timestamp strings (ISO format)
+    else if (typeof timestamp === 'string') {
+      // Try parsing as ISO date first
+      date = new Date(timestamp);
+      
+      // If invalid, try parsing as seconds since epoch
+      if (isNaN(date.getTime())) {
+        const seconds = parseFloat(timestamp);
+        if (!isNaN(seconds)) {
+          date = new Date(seconds * 1000); // Convert seconds to milliseconds
+        }
+      }
+    }
+    else {
+      console.error("Unknown timestamp format:", timestamp);
+      return "Invalid date";
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.error("Invalid date object created from timestamp:", timestamp);
+      return "Invalid date";
+    }
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    
+    // If it's within the last minute
+    if (diffSec < 60) {
+      return diffSec <= 5 ? "Just now" : `${diffSec} seconds ago`;
+    }
+    
+    // If it's within the last hour
+    if (diffMin < 60) {
+      return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+    }
+    
+    // If it's within the last 24 hours
+    if (diffHour < 24) {
+      return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
+    }
+    
+    // If it's yesterday
+    if (diffDay === 1) {
+      return `Yesterday at ${format(date, 'h:mm a')}`;
+    }
+    
+    // If it's within the last 7 days
+    if (diffDay < 7) {
+      return format(date, 'EEEE') + ` at ${format(date, 'h:mm a')}`;
+    }
+    
+    // Otherwise show the full date
+    return format(date, 'MMM d, yyyy • h:mm a');
+  } catch (e) {
+    console.error("Error formatting timestamp:", e, "Original value:", timestamp);
+    return "Invalid date";
+  }
+};
 
 // Import React Charts
 import {
@@ -79,8 +171,8 @@ const COLORS = [
 ];
 
 export function InventoryDashboard() {
-  const { products, loading, error, getLowStockProducts } = useInventory();
-  const { formatCurrency } = useCurrency();
+  const { products, loading, error, getLowStockProducts, businessId } = useInventory();
+  const { formatCurrency, convertCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("overview");
   const [timeRange, setTimeRange] = useState("week");
 
@@ -91,8 +183,7 @@ export function InventoryDashboard() {
     outOfStockCount: 0,
     categories: 0,
     avgPrice: 0,
-    inventoryHealth: 0,
-    topSellingProducts: [],
+    totalSalesValue: 0,
     salesTrend: [],
     categoryDistribution: [],
     stockDistribution: { inStock: 0, lowStock: 0, outOfStock: 0 },
@@ -100,8 +191,9 @@ export function InventoryDashboard() {
   });
 
   const [lowStockProducts, setLowStockProducts] = useState([]);
-  const [recentlyUpdated, setRecentlyUpdated] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
+  const [topSellingProducts, setTopSellingProducts] = useState([]);
 
   // Generate dates for the time range
   const generateDateLabels = () => {
@@ -117,120 +209,383 @@ export function InventoryDashboard() {
     return dates;
   };
 
-  // Generate mock sales data if needed
-  const generateMockSalesData = () => {
-    const dates = generateDateLabels();
-    return dates.map((date) => ({
-      date,
-      sales: Math.floor(Math.random() * 500) + 100,
-      value: Math.floor(Math.random() * 5000) + 1000,
-    }));
+  // Fetch real sales data from Firestore
+  const fetchSalesData = async (businessId) => {
+    try {      
+      if (!businessId) {
+        console.error("No business ID available for filtering sales data");
+        return { 
+          salesTrend: generateDateLabels().map(date => ({ 
+            date, 
+            sales: 0, 
+            value: 0 
+          })), 
+          totalSalesValue: 0 
+        };
+      }
+      
+      const daysToShow = 
+        timeRange === "week" ? 7 : 
+        timeRange === "month" ? 30 : 
+        timeRange === "quarter" ? 90 : 365;
+        
+      const startDate = subDays(new Date(), daysToShow);
+      
+      // Modified query approach to avoid composite index requirement
+      // First filter by businessId only
+      const salesCollection = collection(db, "sales");
+      const salesQuery = query(
+        salesCollection,
+        where("businessId", "==", businessId)
+      );
+      
+      const querySnapshot = await getDocs(salesQuery);
+      
+      // Create a map to store sales by date
+      const salesByDate = {};
+      const dateLabels = generateDateLabels();
+      
+      // Initialize all dates with zero values
+      dateLabels.forEach(date => {
+        salesByDate[date] = { date, sales: 0, value: 0 };
+      });
+      
+      // Calculate total sales value
+      let totalSalesValue = 0;
+      
+      // Process sales data and filter by date in memory
+      querySnapshot.forEach(doc => {
+        const saleData = doc.data();
+        
+        // Safely handle timestamp conversion
+        const saleDate = saleData.timestamp ? 
+          (typeof saleData.timestamp.toDate === 'function' ? 
+            saleData.timestamp.toDate() : new Date(saleData.timestamp)) : new Date();
+        
+        // Filter by date in memory instead of in the query
+        if (saleDate >= startDate) {
+          const dateKey = format(saleDate, "MMM dd");
+          
+          if (salesByDate[dateKey]) {
+            // Count items quantity
+            const itemsCount = saleData.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            
+            // Update sales for the date
+            salesByDate[dateKey].sales += itemsCount;
+            salesByDate[dateKey].value += saleData.total || 0;
+            
+            // Add to total sales value
+            totalSalesValue += saleData.total || 0;
+          }
+        }
+      });
+      
+      // Convert map to array for the chart
+      const salesTrend = Object.values(salesByDate);
+      
+      return { salesTrend, totalSalesValue };
+    } catch (error) {
+      console.error("Error fetching sales data:", error);
+      return { 
+        salesTrend: generateDateLabels().map(date => ({ 
+          date, 
+          sales: 0, 
+          value: 0 
+        })), 
+        totalSalesValue: 0 
+      };
+    }
+  };
+
+  // Fetch top selling products
+  const fetchTopSellingProducts = async (businessId) => {
+    try {
+      if (!businessId) {
+        return [];
+      }
+      
+      const salesCollection = collection(db, "sales");
+      const salesQuery = query(
+        salesCollection,
+        where("businessId", "==", businessId)
+      );
+      
+      const salesSnapshot = await getDocs(salesQuery);
+      
+      // Create a map to track sales counts by product
+      const productSalesMap = {};
+      
+      // Process all sales data
+      salesSnapshot.forEach(doc => {
+        const saleData = doc.data();
+        
+        // Check if the document has items array
+        if (saleData.items && Array.isArray(saleData.items)) {
+          saleData.items.forEach(item => {
+            // Try to use product name as key if no productId
+            const key = item.productId || item.name || item.id || JSON.stringify(item);
+            
+            if (key) {
+              if (!productSalesMap[key]) {
+                productSalesMap[key] = {
+                  id: item.productId || key,
+                  name: item.name || "Product " + key.substring(0, 8),
+                  category: item.category || "Uncategorized",
+                  price: parseFloat(item.price) || 0,
+                  totalSold: 0,
+                  totalRevenue: 0
+                };
+              }
+              
+              const quantity = parseInt(item.quantity) || 1;
+              const price = parseFloat(item.price) || 0;
+              
+              productSalesMap[key].totalSold += quantity;
+              productSalesMap[key].totalRevenue += (price * quantity);
+            }
+          });
+        }
+      });
+      
+      // Convert map to array and sort by total sold (descending)
+      const topSellingProducts = Object.values(productSalesMap)
+        .sort((a, b) => b.totalSold - a.totalSold)
+        .slice(0, 5);
+        
+      return topSellingProducts;
+    } catch (error) {
+      console.error("Error fetching top selling products:", error);
+      return [];
+    }
+  };
+
+  // Fetch recent activities
+  const fetchRecentActivities = async (businessId) => {
+    try {
+      if (!businessId) {
+        console.error("No business ID available for filtering activities");
+        return [];
+      }
+      
+      console.log("Fetching recent activities with business ID:", businessId);
+      
+      // Initialize the recentProductUpdates array
+      const recentProductUpdates = [];
+      
+      // Fetch product updates
+      const productUpdatesQuery = query(
+        collection(db, "products"),
+        where("businessId", "==", businessId)
+      );
+      
+      // Fetch recent sales with improved timestamp handling
+      const salesQuery = query(
+        collection(db, "sales"),
+        where("businessId", "==", businessId)
+      );
+      
+      console.log("Running sales query...");
+      const salesSnapshot = await getDocs(salesQuery);
+      console.log(`Found ${salesSnapshot.docs.length} sales records`);
+      
+      // Process all sales with better timestamp handling
+      const allSales = [];
+      
+      // Process all sales with better timestamp handling
+      salesSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        console.log("Processing sale record:", doc.id, data);
+        let timestamp;
+        
+        // Safely handle the Firestore timestamp conversion
+        if (data.timestamp) {
+          if (typeof data.timestamp.toDate === 'function') {
+            timestamp = data.timestamp.toDate();
+          } else if (data.timestamp instanceof Date) {
+            timestamp = data.timestamp;
+          } else if (typeof data.timestamp === 'number') {
+            timestamp = new Date(data.timestamp);
+          } else if (typeof data.timestamp === 'object' && 'seconds' in data.timestamp) {
+            timestamp = new Date(data.timestamp.seconds * 1000 + (data.timestamp.nanoseconds || 0) / 1000000);
+          } else if (typeof data.timestamp === 'string') {
+            timestamp = new Date(data.timestamp);
+          } else {
+            timestamp = new Date();
+            console.warn("Unknown sale timestamp format:", data.timestamp);
+          }
+        } else {
+          timestamp = new Date();
+        }
+        
+        // Validate timestamp
+        if (isNaN(timestamp.getTime())) {
+          console.error("Invalid sales timestamp:", data.timestamp);
+          timestamp = new Date(); // Use current date as fallback
+        }
+          
+        allSales.push({
+          id: doc.id,
+          type: 'sale',
+          name: `Sale #${doc.id.substring(0, 5)}`,
+          timestamp: timestamp,
+          details: {
+            items: data.items?.length || 0,
+            total: data.total || 0
+          }
+        });
+      });
+      
+      // Sort sales by timestamp and take only 5 most recent
+      const recentSales = allSales
+        .sort((a, b) => {
+          // Ensure we're comparing timestamp objects correctly
+          const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : 0;
+          const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : 0;
+          return timeB - timeA;
+        })
+        .slice(0, 5);
+      
+      console.log("Recent sales after processing:", recentSales);
+      
+      // Combine and sort by timestamp
+      const allActivities = [...recentProductUpdates, ...recentSales]
+        .sort((a, b) => {
+          // Ensure we're comparing timestamp objects correctly
+          const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : 0;
+          const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : 0;
+          return timeB - timeA;
+        })
+        .slice(0, 8);
+      
+      console.log("All activities after combining:", allActivities);
+      console.log("Sales activities:", allActivities.filter(a => a.type === 'sale'));
+        
+      return allActivities;
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      return [];
+    }
   };
 
   // Calculate dashboard metrics whenever products change
   useEffect(() => {
-    if (products.length > 0) {
-      // Calculate total products
-      const totalProducts = products.length;
+    const fetchData = async () => {
+      if (loading) return; // Don't fetch data while loading
+      
+      try {
+        if (products.length > 0) {
+          // Calculate total products
+          const totalProducts = products.length;
 
-      // Calculate total inventory value and average price
-      let totalValue = 0;
-      let totalQuantity = 0;
+          // Calculate total inventory value and average price
+          let totalValue = 0;
+          let totalQuantity = 0;
 
-      products.forEach((product) => {
-        const value = product.price * product.quantity;
-        totalValue += value;
-        totalQuantity += product.quantity;
-      });
+          products.forEach((product) => {
+            const value = product.price * product.quantity;
+            totalValue += value;
+            totalQuantity += product.quantity;
+          });
 
-      const avgPrice = totalProducts > 0 ? totalValue / totalProducts : 0;
+          const avgPrice = totalProducts > 0 ? totalValue / totalProducts : 0;
 
-      // Get low stock and out of stock products
-      const lowStock = products.filter(
-        (product) =>
-          product.quantity > 0 && product.quantity <= product.threshold
-      );
+          // Get low stock and out of stock products
+          const lowStock = products.filter(
+            (product) =>
+              product.quantity > 0 && product.quantity <= product.threshold
+          );
 
-      const outOfStock = products.filter((product) => product.quantity === 0);
+          const outOfStock = products.filter((product) => product.quantity === 0);
 
-      // Stock distribution
-      const stockDistribution = {
-        inStock: products.length - lowStock.length - outOfStock.length,
-        lowStock: lowStock.length,
-        outOfStock: outOfStock.length,
-      };
+          // Stock distribution
+          const stockDistribution = {
+            inStock: products.length - lowStock.length - outOfStock.length,
+            lowStock: lowStock.length,
+            outOfStock: outOfStock.length,
+          };
 
-      // Count unique categories
-      const uniqueCategories = new Set(
-        products.map((product) => product.category).filter(Boolean)
-      );
+          // Count unique categories
+          const uniqueCategories = new Set(
+            products.map((product) => product.category).filter(Boolean)
+          );
 
-      // Calculate category distribution
-      const categoryMap = products.reduce((acc, product) => {
-        const category = product.category || "Uncategorized";
-        acc[category] = (acc[category] || 0) + 1;
-        return acc;
-      }, {});
+          // Calculate category distribution
+          const categoryMap = {};
+          products.forEach((product) => {
+            const category = product.category || "Uncategorized";
+            categoryMap[category] = (categoryMap[category] || 0) + 1;
+          });
 
-      const categoryDistribution = Object.keys(categoryMap).map((category) => ({
-        name: category,
-        value: categoryMap[category],
-        fill: COLORS[Math.floor(Math.random() * COLORS.length)],
-      }));
+          const categoryDistribution = Object.keys(categoryMap).map(
+            (category, index) => ({
+              name: category,
+              value: categoryMap[category],
+              fill: COLORS[index % COLORS.length],
+            })
+          );
 
-      // Generate top selling products (simulated in this case)
-      const topSellingProducts = [...products]
-        .sort((a, b) => (b.sold || 0) - (a.sold || 0))
-        .slice(0, 5)
-        .map((product) => ({
-          name: product.name,
-          value: product.sold || Math.floor(Math.random() * 50) + 10,
-          category: product.category || "Uncategorized",
-        }));
+          // Fetch sales data
+          const { salesTrend, totalSalesValue } = await fetchSalesData(businessId);
+          
+          // Fetch recent activities
+          const recentActivities = await fetchRecentActivities(businessId);
+          setRecentActivity(recentActivities);
 
-      // Calculate inventory health (percentage of products not low/out of stock)
-      const inventoryHealth =
-        totalProducts > 0
-          ? ((totalProducts - lowStock.length - outOfStock.length) /
-              totalProducts) *
-            100
-          : 0;
+          // Fetch top selling products
+          const topSelling = await fetchTopSellingProducts(businessId);
+          setTopSellingProducts(topSelling);
 
-      // Set the stats
-      setStats({
-        totalProducts,
-        totalValue,
-        lowStockCount: lowStock.length,
-        outOfStockCount: outOfStock.length,
-        categories: uniqueCategories.size,
-        avgPrice,
-        inventoryHealth,
-        topSellingProducts,
-        salesTrend: generateMockSalesData(),
-        categoryDistribution,
-        stockDistribution,
-        reorderSuggestions: lowStock.slice(0, 3),
-      });
+          // Set the stats
+          setStats({
+            totalProducts,
+            totalValue,
+            lowStockCount: lowStock.length,
+            outOfStockCount: outOfStock.length,
+            categories: uniqueCategories.size,
+            avgPrice,
+            totalSalesValue,
+            salesTrend,
+            categoryDistribution,
+            stockDistribution,
+            reorderSuggestions: lowStock.slice(0, 3),
+          });
 
-      // Set low stock products
-      setLowStockProducts(lowStock);
+          // Set low stock products
+          setLowStockProducts(lowStock);
 
-      // Get recently updated products (last 5)
-      const sorted = [...products]
-        .filter((p) => p.updatedAt)
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, 5);
+          // Set top products (by value)
+          const topByValue = [...products]
+            .sort((a, b) => b.price * b.quantity - a.price * a.quantity)
+            .slice(0, 5);
 
-      setRecentlyUpdated(sorted);
-
-      // Set top products (by value)
-      const topByValue = [...products]
-        .sort((a, b) => b.price * b.quantity - a.price * a.quantity)
-        .slice(0, 5);
-
-      setTopProducts(topByValue);
-    }
-  }, [products, timeRange]);
+          setTopProducts(topByValue);
+        } else {
+          // Reset stats if no products
+          setStats({
+            totalProducts: 0,
+            totalValue: 0,
+            lowStockCount: 0,
+            outOfStockCount: 0,
+            categories: 0,
+            avgPrice: 0,
+            totalSalesValue: 0,
+            salesTrend: [],
+            categoryDistribution: [],
+            stockDistribution: { inStock: 0, lowStock: 0, outOfStock: 0 },
+            reorderSuggestions: [],
+          });
+          setLowStockProducts([]);
+          setTopProducts([]);
+          setTopSellingProducts([]);
+          setRecentActivity([]);
+        }
+      } catch (error) {
+        console.error("Error calculating dashboard metrics:", error);
+      }
+    };
+    
+    fetchData();
+  }, [products, timeRange, businessId, loading]);
 
   if (loading) {
     return (
@@ -264,33 +619,7 @@ export function InventoryDashboard() {
               <Layers className="mr-2 h-4 w-4" />
               Inventory Health
             </TabsTrigger>
-            <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
-            <TabsTrigger value="recommendations">Insights</TabsTrigger>
           </TabsList>
-
-          {/* <div className="flex gap-2">
-            <Button
-              variant={timeRange === "week" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimeRange("week")}
-            >
-              Week
-            </Button>
-            <Button
-              variant={timeRange === "month" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimeRange("month")}
-            >
-              Month
-            </Button>
-            <Button
-              variant={timeRange === "quarter" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTimeRange("quarter")}
-            >
-              Quarter
-            </Button>
-          </div> */}
         </div>
 
         <TabsContent value="overview" className="mt-4">
@@ -306,12 +635,8 @@ export function InventoryDashboard() {
                 <Package className="h-4 w-4 text-indigo-600" />
               </CardHeader>
               <CardContent className="relative">
-                <div className="text-3xl font-bold">{stats.totalProducts}</div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                  <span className="text-green-500 font-medium">+4.3%</span> from
-                  last month
-                </p>
+                <div className="text-3xl font-bold break-words">{stats.totalProducts}</div>
+              
               </CardContent>
             </Card>
 
@@ -324,39 +649,26 @@ export function InventoryDashboard() {
                 <DollarSign className="h-4 w-4 text-sky-600" />
               </CardHeader>
               <CardContent className="relative">
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-bold break-words min-w-0">
                   <CurrencyFormatter value={stats.totalValue} />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                  <span className="text-green-500 font-medium">+2.1%</span> from
-                  last month
-                </p>
+               
               </CardContent>
             </Card>
 
             <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-amber-500/5 rounded-md"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-green-500/5 rounded-md"></div>
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Inventory Health
+                  Total Sales Value
                 </CardTitle>
-                <Layers className="h-4 w-4 text-amber-600" />
+                <DollarSign className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent className="relative">
-                <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold">
-                    {stats.inventoryHealth.toFixed(1)}%
-                  </div>
-                  {stats.inventoryHealth > 80 ? (
-                    <Badge className="bg-green-500">Good</Badge>
-                  ) : stats.inventoryHealth > 50 ? (
-                    <Badge className="bg-amber-500">Average</Badge>
-                  ) : (
-                    <Badge className="bg-red-500">Needs Attention</Badge>
-                  )}
+                <div className="text-3xl font-bold break-words min-w-0">
+                  <CurrencyFormatter value={stats.totalSalesValue} />
                 </div>
-                <Progress value={stats.inventoryHealth} className="h-2 mt-2" />
+                
               </CardContent>
             </Card>
 
@@ -369,10 +681,10 @@ export function InventoryDashboard() {
                 <AlertTriangle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent className="relative">
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-bold break-words min-w-0">
                   {stats.lowStockCount + stats.outOfStockCount}
                 </div>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <Badge
                     variant="outline"
                     className="border-amber-500 text-amber-600"
@@ -395,19 +707,40 @@ export function InventoryDashboard() {
             {/* Sales Trend Chart */}
             <Card className="col-span-1 lg:col-span-4">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-indigo-600" />
-                  Sales Trend
-                </CardTitle>
-                <CardDescription>
-                  Sales performance over the past{" "}
-                  {timeRange === "week"
-                    ? "7"
-                    : timeRange === "month"
-                    ? "30"
-                    : "90"}{" "}
-                  days
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-indigo-600" />
+                      Sales Trend
+                    </CardTitle>
+                    <CardDescription>
+                      Sales performance over time
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={timeRange === "week" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTimeRange("week")}
+                    >
+                      Week
+                    </Button>
+                    <Button
+                      variant={timeRange === "month" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTimeRange("month")}
+                    >
+                      Month
+                    </Button>
+                    <Button
+                      variant={timeRange === "quarter" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTimeRange("quarter")}
+                    >
+                      Quarter
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
@@ -442,10 +775,12 @@ export function InventoryDashboard() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value) => [
-                          `${formatCurrency(value)}`,
+                          `${formatCurrency(convertCurrency(value, 'USD'))}`,
                           "Sales",
                         ]}
                         labelFormatter={(label) => `Date: ${label}`}
+                        contentStyle={{ color: '#111', backgroundColor: '#fff' }}
+                        labelStyle={{ color: '#111' }}
                       />
                       <Area
                         type="monotone"
@@ -640,73 +975,75 @@ export function InventoryDashboard() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-indigo-600" />
-                  Recent Activity
+                  <Clock className="h-5 w-5 text-indigo-600" />
+                  Recent Sales
                 </CardTitle>
                 <CardDescription>
-                  Latest inventory changes and updates
+                  Latest sales transactions and revenue
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-72">
-                  {recentlyUpdated.length > 0 ? (
+                  {recentActivity.length > 0 ? (
                     <div className="space-y-0 p-1">
-                      {recentlyUpdated.map((product) => (
-                        <div
-                          key={product.id}
-                          className="flex items-start gap-4 border-b border-muted py-3 px-2 last:border-0"
-                        >
+                      {recentActivity
+                        .filter(activity => activity.type === 'sale')
+                        .map((activity) => (
                           <div
-                            className={`rounded-full p-2 ${
-                              product.quantity <= product.threshold
-                                ? "bg-amber-100"
-                                : "bg-green-100"
-                            }`}
+                            key={activity.id}
+                            className="flex items-start gap-4 border-b border-muted py-3 px-2 last:border-0 hover:bg-muted/30 transition-colors"
                           >
-                            <RefreshCw
-                              className={`h-4 w-4 ${
-                                product.quantity <= product.threshold
-                                  ? "text-amber-600"
-                                  : "text-green-600"
-                              }`}
-                            />
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <div className="text-sm font-medium leading-none flex items-center">
-                              {product.name}
-                              {product.quantity <= product.threshold && (
+                            {/* Activity Icon */}
+                            <div className="rounded-full p-2 bg-indigo-100 dark:bg-indigo-900/20">
+                              <ShoppingCart
+                                className="h-4 w-4 text-indigo-600 dark:text-indigo-400"
+                              />
+                            </div>
+                            
+                            {/* Activity Content */}
+                            <div className="flex-1 space-y-1">
+                              <div className="text-sm font-medium leading-none flex items-center">
+                                {activity.name}
                                 <Badge
                                   variant="outline"
-                                  className="ml-2 text-xs border-amber-500 text-amber-600"
+                                  className="ml-2 text-xs border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
                                 >
-                                  Low Stock
+                                  Sale
                                 </Badge>
-                              )}
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground">
+                                {activity.details.items} items sold for <CurrencyFormatter value={activity.details.total} />
+                              </p>
+                              
+                              {/* Activity Timestamp */}
+                              <p className="text-xs text-muted-foreground flex items-center mt-1 px-2 py-1 rounded">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {formatTimestamp(activity.timestamp)}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Quantity: {product.quantity} | Category:{" "}
-                              {product.category || "Uncategorized"}
-                            </p>
-                            <p className="text-xs text-muted-foreground flex items-center mt-1">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {product.updatedAt
-                                ? new Date(product.updatedAt).toLocaleString()
-                                : "Unknown date"}
+                            
+                            {/* Activity Value */}
+                            <div>
+                              <CurrencyFormatter
+                                value={activity.details.total}
+                                className="text-sm font-medium"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {recentActivity.filter(activity => activity.type === 'sale').length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-muted-foreground">
+                              No recent sales found
                             </p>
                           </div>
-                          <div>
-                            <CurrencyFormatter
-                              value={product.price * product.quantity}
-                              className="text-sm font-medium"
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        )}
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground">
-                        No recent updates found
+                        No recent sales found
                       </p>
                     </div>
                   )}
@@ -745,10 +1082,8 @@ export function InventoryDashboard() {
                       {lowStockProducts.map((product) => (
                         <TableRow key={product.id}>
                           <TableCell>
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              ID: {product.id.substring(0, 8)}...
-                            </div>
+                            <div className="font-medium py-2">{product.name}</div>
+                          
                           </TableCell>
                           <TableCell>
                             {product.category || "Uncategorized"}
@@ -815,6 +1150,8 @@ export function InventoryDashboard() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value) => [`${value} items`, "Count"]}
+                        contentStyle={{ color: '#111', backgroundColor: '#fff' }}
+                        labelStyle={{ color: '#111', fontWeight: 'bold' }}
                       />
                       <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]}>
                         {stats.categoryDistribution.map((entry, index) => (
@@ -829,445 +1166,62 @@ export function InventoryDashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
+            
+            {/* Top Selling Products Section */}
+            <Card className="md:col-span-2 mt-4">
+              <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5 text-indigo-600" />
+                  <ShoppingCart className="h-5 w-5 text-green-600" />
                   Top Selling Products
                 </CardTitle>
                 <CardDescription>
-                  Your most popular products by sales volume
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      layout="vertical"
-                      data={stats.topSellingProducts}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" fontSize={12} />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={150}
-                        fontSize={12}
-                      />
-                      <Tooltip />
-                      <Legend />
-                      <Bar
-                        dataKey="value"
-                        name="Units Sold"
-                        fill="#4f46e5"
-                        radius={[0, 4, 4, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="sales">
-          {/* Sales Analytics tab content */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Sales Value
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-indigo-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  <CurrencyFormatter value={68943.45} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                  <span className="text-green-500 font-medium">
-                    +12.5%
-                  </span>{" "}
-                  from previous period
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Average Order Value
-                </CardTitle>
-                <ShoppingBag className="h-4 w-4 text-indigo-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  <CurrencyFormatter value={128.76} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                  <span className="text-green-500 font-medium">+3.2%</span> from
-                  previous period
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Inventory Turnover
-                </CardTitle>
-                <RefreshCw className="h-4 w-4 text-indigo-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">4.2</div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                  <TrendingDown className="h-3 w-3 mr-1 text-red-500" />
-                  <span className="text-red-500 font-medium">-0.5</span> from
-                  previous period
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-3">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-indigo-600" />
-                  Sales Performance
-                </CardTitle>
-                <CardDescription>
-                  Trend analysis of sales over time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={stats.salesTrend}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(value) => value.split(" ")[1]}
-                        fontSize={12}
-                      />
-                      <YAxis yAxisId="left" fontSize={12} />
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        fontSize={12}
-                      />
-                      <Tooltip
-                        formatter={(value, name) => [
-                          name === "sales"
-                            ? `${value} units`
-                            : formatCurrency(value),
-                          name === "sales" ? "Units Sold" : "Sales Value",
-                        ]}
-                      />
-                      <Legend />
-                      <Line
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="sales"
-                        name="Units Sold"
-                        stroke="#8b5cf6"
-                        activeDot={{ r: 8 }}
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="value"
-                        name="Sales Value"
-                        stroke="#10b981"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="recommendations">
-          {/* Recommendations tab content */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Actionable Insights</CardTitle>
-                <CardDescription>
-                  Recommendations based on your inventory data
+                  Products with the highest sales volume
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {lowStockProducts.length > 0 && (
-                    <div className="p-4">
-                      <div className="flex items-start gap-4 mb-2">
-                        <div className="rounded-full bg-amber-100 p-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium">
-                            Restock Low Inventory
-                          </h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {lowStockProducts.length} products are below their
-                            minimum threshold.
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Units Sold</TableHead>
+                      <TableHead>Revenue Generated</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topSellingProducts.length > 0 ? (
+                      topSellingProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div className="font-medium py-2">{product.name}</div>
+                            
+                          </TableCell>
+                          <TableCell>
+                            {product.category || "Uncategorized"}
+                          </TableCell>
+                          <TableCell className="font-medium text-green-600">
+                            {product.totalSold}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <CurrencyFormatter value={product.totalRevenue} />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-4">
+                          <p className="text-muted-foreground">
+                            No sales data available yet
                           </p>
-                        </div>
-                      </div>
-                      <div className="ml-10 mt-2">
-                        <Button variant="outline" size="sm" className="h-8">
-                          Generate Purchase Orders
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4">
-                    <div className="flex items-start gap-4 mb-2">
-                      <div className="rounded-full bg-indigo-100 p-2">
-                        <BarChart2 className="h-4 w-4 text-indigo-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium">
-                          Optimize Inventory Distribution
-                        </h4>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {stats.categories > 1
-                            ? `Your inventory is spread across ${stats.categories} categories. Consider balancing stock levels.`
-                            : "Consider categorizing your inventory for better management."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="flex items-start gap-4 mb-2">
-                      <div className="rounded-full bg-green-100 p-2">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium">
-                          Pricing Strategy Review
-                        </h4>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Your average product price is{" "}
-                          <CurrencyFormatter value={stats.avgPrice} />. Consider
-                          reviewing pricing for optimal profitability.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-full bg-blue-100 p-2">
-                        <TrendingUp className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium">
-                          Growth Opportunities
-                        </h4>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Based on sales trends, consider expanding your
-                          top-selling categories for increased revenue.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Suggested Reorders</CardTitle>
-                <CardDescription>
-                  Items that should be reordered soon
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[300px]">
-                  <div className="divide-y">
-                    {lowStockProducts.slice(0, 5).map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-4"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{product.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge
-                              variant={
-                                product.quantity === 0
-                                  ? "destructive"
-                                  : "outline"
-                              }
-                              className="text-xs"
-                            >
-                              {product.quantity} in stock
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              Min: {product.threshold}
-                            </span>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Reorder
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-                <div className="p-4 border-t">
-                  <Button variant="secondary" className="w-full">
-                    View All Reorder Suggestions
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-3">
-              <CardHeader>
-                <CardTitle>Inventory Health Score</CardTitle>
-                <CardDescription>
-                  Overall assessment of your inventory management
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center md:flex-row md:justify-between gap-6">
-                  <div className="flex items-center justify-center">
-                    <div className="relative w-40 h-40">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-4xl font-bold">
-                            {Math.round(78)}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            out of 100
-                          </div>
-                        </div>
-                      </div>
-                      {/* Score Circle */}
-                      <svg className="w-full h-full" viewBox="0 0 100 100">
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="#e2e8f0"
-                          strokeWidth="8"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="45"
-                          fill="none"
-                          stroke="#4f46e5"
-                          strokeWidth="8"
-                          strokeDasharray="283"
-                          strokeDashoffset={283 - (283 * 78) / 100}
-                          transform="rotate(-90 50 50)"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 grid gap-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-slate-100 rounded-md p-3">
-                        <div className="text-xs font-medium text-slate-500 mb-1">
-                          Stock Level
-                        </div>
-                        <div className="text-lg font-semibold">82%</div>
-                        <Progress value={82} className="h-1 mt-2" />
-                      </div>
-                      <div className="bg-slate-100 rounded-md p-3">
-                        <div className="text-xs font-medium text-slate-500 mb-1">
-                          Turnover
-                        </div>
-                        <div className="text-lg font-semibold">65%</div>
-                        <Progress value={65} className="h-1 mt-2" />
-                      </div>
-                      <div className="bg-slate-100 rounded-md p-3">
-                        <div className="text-xs font-medium text-slate-500 mb-1">
-                          Diversity
-                        </div>
-                        <div className="text-lg font-semibold">86%</div>
-                        <Progress value={86} className="h-1 mt-2" />
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-100 rounded-md p-3">
-                      <div className="text-xs font-medium text-slate-500 mb-1">
-                        Recommendations
-                      </div>
-                      <ul className="text-sm space-y-1 mt-1">
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          Diverse product mix
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-500" />
-                          Improve stock turnover rate
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          Good overall stock levels
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="w-full md:w-1/4">
-                    <Card>
-                      <CardHeader className="py-3">
-                        <CardTitle className="text-sm">Monthly Trend</CardTitle>
-                      </CardHeader>
-                      <CardContent className="py-2">
-                        <div className="h-24">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart
-                              data={[
-                                { month: "Jan", score: 65 },
-                                { month: "Feb", score: 68 },
-                                { month: "Mar", score: 72 },
-                                { month: "Apr", score: 78 },
-                              ]}
-                            >
-                              <Line
-                                type="monotone"
-                                dataKey="score"
-                                stroke="#4f46e5"
-                                strokeWidth={2}
-                                dot={{ r: 3 }}
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="text-center text-xs text-muted-foreground mt-2">
-                          +13 points in last 3 months
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="bg-slate-50">
-                <div className="w-full flex justify-between items-center">
-                  <div className="text-sm text-slate-500">
-                    Last assessed: April 11, 2025
-                  </div>
-                  <Button size="sm">
-                    Improve Score <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
+           
           </div>
         </TabsContent>
       </Tabs>

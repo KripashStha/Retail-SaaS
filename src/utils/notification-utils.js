@@ -96,47 +96,8 @@ export const shouldNotifyLowStock = (product) => {
 };
 
 /**
- * Creates a notification for a successful sale
- * @param {Object} saleData - The sale data
- * @param {string} businessId - The business ID
- * @returns {Promise} - Promise resolving to the created notification
+ * Creates a notification for new products
  */
-export const createSaleNotification = async (saleData, businessId) => {
-  try {
-    if (!saleData || !businessId) {
-      console.error("Missing required parameters for sale notification");
-      return null;
-    }
-
-    const currencySymbol = await getCurrencySymbol(businessId);
-    const itemCount = saleData.items.reduce((sum, item) => sum + item.quantity, 0);
-    const title = `New Sale: ${currencySymbol}${saleData.total.toFixed(2)}`;
-    const message = `A sale of ${currencySymbol}${saleData.total.toFixed(2)} was completed with ${itemCount} item(s).`;
-
-    const notification = await addDoc(collection(db, "notifications"), {
-      title,
-      message,
-      type: "sale",
-      businessId,
-      read: false,
-      timestamp: serverTimestamp(),
-    });
-
-    return {
-      id: notification.id,
-      title,
-      message,
-      type: "sale",
-    };
-  } catch (error) {
-    console.error("Error creating sale notification:", error);
-    return null;
-  }
-};
-
-
- // Creates a notification for new products
- 
 export const createNewProductNotification = async (product, businessId) => {
   try {
     if (!product || !businessId) {
@@ -175,9 +136,9 @@ export const createNewProductNotification = async (product, businessId) => {
   }
 };
 
-
-// Creates a notification for inventory updates
- 
+/**
+ * Creates a notification for inventory updates
+ */
 export const createInventoryUpdateNotification = async (product, changes, businessId) => {
   try {
     if (!product || !changes || !businessId) {

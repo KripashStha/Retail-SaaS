@@ -157,7 +157,8 @@ export async function PUT(request) {
       changes.barcode = { from: originalProduct.barcode || 'None', to: barcode || 'None' };
     }
 
-    // Prepare update data
+    // Prepare update data - Use a Firestore server timestamp or consistent date format
+    const now = new Date();
     const updateData = {
       name,
       price: parseFloat(price),
@@ -165,11 +166,14 @@ export async function PUT(request) {
       threshold: parseInt(threshold, 10) || 0,
       category: category || '',
       barcode: barcode || '',
-      updatedAt: new Date().toISOString(),
+      updatedAt: now.toISOString(), // Use consistent ISO format for timestamps
     };
+
+    console.log('Updating product with data:', updateData);
 
     // Update the product in the database
     await updateDoc(productRef, updateData);
+    console.log('Product updated successfully in Firestore');
 
     // Create a notification for the inventory update
     try {
@@ -183,10 +187,15 @@ export async function PUT(request) {
       id,
       ...updateData,
       changes,
+      message: 'Product updated successfully',
+      success: true
     }, { status: 200 });
   } catch (error) {
     console.error('Error updating product:', error);
-    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to update product', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
 

@@ -57,7 +57,6 @@ import {
 import { BrowserMultiFormatReader } from "@zxing/library";
 import debounce from "lodash/debounce";
 import {
-  createSaleNotification,
   createLowStockNotification,
   shouldNotifyLowStock,
 } from "@/utils/notification-utils";
@@ -373,9 +372,6 @@ export function PointOfSale() {
         ...saleData,
         timestamp: new Date().toISOString(),
       });
-
-      // Create sale notification
-      await createSaleNotification(saleData, businessId);
 
       // Check for low stock after updating inventory
       for (const item of cart) {

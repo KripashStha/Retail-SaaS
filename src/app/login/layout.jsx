@@ -3,7 +3,7 @@ import { getServerSession } from "@/lib/server-auth";
 import { redirect } from "next/navigation";
 
 // Force dynamic rendering for this layout and all its child routes
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function LoginLayout({ children }) {
   // Check if user is already authenticated

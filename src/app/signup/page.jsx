@@ -21,6 +21,7 @@ import {
 import GoogleOauth from "@/components/GoogleOauth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 export default function SignUp() {
   const [company, setCompany] = useState("");
@@ -47,18 +48,21 @@ export default function SignUp() {
 
         console.log("Business document created:", businessRef.id);
 
-      
         await setDoc(doc(db, "Users", user.uid), {
           email: user.email,
           userName: name,
           role: "admin",
           businessId: businessRef.id,
         });
-        
 
         // Send verification email
         await sendEmailVerification(user);
-        console.log("Verification email sent.");
+        toast({
+          variant: "default",
+          title: "Email Verification Sent",
+          description:
+            "Please verify the email to proceed. Check your inbox for the verification link.",
+        });
 
         console.log("Account created successfully");
         router.push("/login?message=verify-email");
@@ -256,4 +260,4 @@ export default function SignUp() {
 }
 
 // Mark this route as dynamic
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
