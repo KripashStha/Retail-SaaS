@@ -7,7 +7,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../../firebase/dbConfig";
 import { setDoc, doc, addDoc, collection } from "firebase/firestore";
-import { Eye, EyeOff, Package } from "lucide-react";
+import { Eye, EyeOff, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,11 +30,13 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSignUp = async (e) => {
     e.preventDefault();
     if (validateForm()) {
+      setIsLoading(true);
       try {
         await createUserWithEmailAndPassword(auth, email, password);
         const user = auth.currentUser;
@@ -68,6 +70,13 @@ export default function SignUp() {
         router.push("/login?message=verify-email");
       } catch (err) {
         console.log(err.message);
+        toast({
+          variant: "destructive",
+          title: "Sign Up Failed",
+          description: err.message,
+        });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -125,6 +134,7 @@ export default function SignUp() {
               className={`${
                 errors.company ? "border-red-500" : "border-gray-300"
               }`}
+              disabled={isLoading}
             />
             {errors.company && (
               <p className="text-sm text-red-500">{errors.company}</p>
@@ -140,6 +150,7 @@ export default function SignUp() {
               className={`${
                 errors.name ? "border-red-500" : "border-gray-300"
               }`}
+              disabled={isLoading}
             />
             {errors.name && (
               <p className="text-sm text-red-500">{errors.name}</p>
@@ -156,6 +167,7 @@ export default function SignUp() {
               className={`${
                 errors.email ? "border-red-500" : "border-gray-300"
               }`}
+              disabled={isLoading}
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email}</p>
@@ -174,6 +186,7 @@ export default function SignUp() {
                 className={`${
                   errors.password ? "border-red-500" : "border-gray-300"
                 }`}
+                disabled={isLoading}
               />
               {errors.password && (
                 <p className="text-sm text-red-500">{errors.password}</p>
@@ -182,6 +195,7 @@ export default function SignUp() {
                 type="button"
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff
@@ -212,8 +226,16 @@ export default function SignUp() {
           <Button
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={handleSignUp}
+            disabled={isLoading}
           >
-            Create Account
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              "Create Account"
+            )}
           </Button>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

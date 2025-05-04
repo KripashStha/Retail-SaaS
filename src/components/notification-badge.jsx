@@ -27,23 +27,19 @@ export function NotificationBadge() {
           return;
         }
 
-        console.log("Fetching business ID for notifications...");
         const userQuery = query(
           collection(db, "Users"),
           where("email", "==", auth.currentUser.email)
         );
-        
+
         const userSnapshot = await getDocs(userQuery);
         if (!userSnapshot.empty) {
           const userData = userSnapshot.docs[0].data();
-          console.log("Found business ID:", userData.businessId);
           setBusinessId(userData.businessId);
         } else {
-          console.error("No user document found for email:", auth.currentUser.email);
           setLoading(false);
         }
       } catch (error) {
-        console.error("Error fetching business ID:", error);
         setLoading(false);
       }
     };
@@ -66,8 +62,6 @@ export function NotificationBadge() {
   useEffect(() => {
     if (!businessId) return;
 
-    console.log("Setting up notification listener for business:", businessId);
-    
     // Create a query for unread notifications
     const unreadQuery = query(
       collection(db, "notifications"),
@@ -80,12 +74,10 @@ export function NotificationBadge() {
       unreadQuery,
       (snapshot) => {
         const count = snapshot.docs.length;
-        console.log(`Found ${count} unread notifications`);
         setUnreadCount(count);
         setLoading(false);
       },
       (error) => {
-        console.error("Error in notification listener:", error);
         setLoading(false);
       }
     );
@@ -111,11 +103,11 @@ export function NotificationBadge() {
     <div className="relative">
       <Bell className="h-5 w-5 mr-3" />
       {unreadCount > 0 && (
-        <Badge 
-          className="absolute -top-1 -right-44 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white border-none" 
+        <Badge
+          className="absolute -top-1 -right-44 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white border-none"
           variant="destructive"
         >
-          {unreadCount > 9 ? '9+' : unreadCount}
+          {unreadCount > 9 ? "9+" : unreadCount}
         </Badge>
       )}
     </div>

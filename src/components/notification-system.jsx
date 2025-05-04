@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Check, CheckCheck, AlertTriangle, X, RefreshCw, PlusCircle, Database } from "lucide-react";
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  AlertTriangle,
+  X,
+  RefreshCw,
+  PlusCircle,
+  Database,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -38,49 +47,54 @@ export function NotificationSystem() {
 
   // Fetch business ID and set up notification listener
   useEffect(() => {
-    const fetchBusinessData = async () => {
+    const fetchBusinessData = async (user) => {
       try {
-        if (auth.currentUser) {
+        if (user) {
           const userDoc = await getDocs(
-            query(
-              collection(db, "Users"),
-              where("email", "==", auth.currentUser.email)
-            )
+            query(collection(db, "Users"), where("email", "==", user.email))
           );
-          
+
           if (!userDoc.empty) {
             const businessId = userDoc.docs[0].data().businessId;
             setBusinessId(businessId);
-            
+
             // Set up real-time listener for notifications with proper ordering
             const notificationsQuery = query(
               collection(db, "notifications"),
               where("businessId", "==", businessId),
               orderBy("timestamp", "desc")
             );
-            
-            const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-              const notificationData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                timestamp: doc.data().timestamp?.toDate() || new Date()
-              }));
-              
-              setNotifications(notificationData);
-              setUnreadCount(notificationData.filter(n => !n.read).length);
-              setLoading(false);
-            }, (error) => {
-              console.error("Notification listener error:", error);
-              toast({
-                title: "Error",
-                description: "Failed to load notifications",
-                variant: "destructive",
-              });
-              setLoading(false);
-            });
-            
-            return () => unsubscribe();
+
+            const unsubscribe = onSnapshot(
+              notificationsQuery,
+              (snapshot) => {
+                const notificationData = snapshot.docs.map((doc) => ({
+                  id: doc.id,
+                  ...doc.data(),
+                  timestamp: doc.data().timestamp?.toDate() || new Date(),
+                }));
+
+                setNotifications(notificationData);
+                setUnreadCount(notificationData.filter((n) => !n.read).length);
+                setLoading(false);
+              },
+              (error) => {
+                console.error("Notification listener error:", error);
+                toast({
+                  title: "Error",
+                  description: "Failed to load notifications",
+                  variant: "destructive",
+                });
+                setLoading(false);
+              }
+            );
+
+            return unsubscribe;
+          } else {
+            setLoading(false);
           }
+        } else {
+          setLoading(false);
         }
       } catch (error) {
         console.error("Error fetching business data:", error);
@@ -91,9 +105,32 @@ export function NotificationSystem() {
         });
         setLoading(false);
       }
+
+      return null;
     };
-    
-    fetchBusinessData();
+
+    // Listen to auth state changes
+    let notificationListener = null;
+    const authUnsubscribe = auth.onAuthStateChanged(async (user) => {
+      // Clean up previous notification listener if exists
+      if (notificationListener) {
+        notificationListener();
+      }
+
+      if (user) {
+        notificationListener = await fetchBusinessData(user);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Clean up all listeners
+    return () => {
+      authUnsubscribe();
+      if (notificationListener) {
+        notificationListener();
+      }
+    };
   }, []);
 
   // Mark a single notification as read
@@ -101,21 +138,21 @@ export function NotificationSystem() {
     try {
       const notificationRef = doc(db, "notifications", notificationId);
       await updateDoc(notificationRef, {
-        read: true
+        read: true,
       });
-      
+
       // Update local state
-      setNotifications(prevNotifications =>
-        prevNotifications.map(notification =>
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notification) =>
           notification.id === notificationId
             ? { ...notification, read: true }
             : notification
         )
       );
-      
+
       // Update unread count
-      setUnreadCount(prev => Math.max(0, prev - 1));
-      
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
       toast({
         title: "Success",
         description: "Notification marked as read",
@@ -134,27 +171,27 @@ export function NotificationSystem() {
   const markAllAsRead = async () => {
     try {
       const batch = writeBatch(db);
-      
-      const unreadNotifications = notifications.filter(n => !n.read);
-      
-      unreadNotifications.forEach(notification => {
+
+      const unreadNotifications = notifications.filter((n) => !n.read);
+
+      unreadNotifications.forEach((notification) => {
         const notificationRef = doc(db, "notifications", notification.id);
         batch.update(notificationRef, { read: true });
       });
-      
+
       await batch.commit();
-      
+
       // Update local state
-      setNotifications(prevNotifications =>
-        prevNotifications.map(notification => ({
+      setNotifications((prevNotifications) =>
+        prevNotifications.map((notification) => ({
           ...notification,
-          read: true
+          read: true,
         }))
       );
-      
+
       // Update unread count
       setUnreadCount(0);
-      
+
       toast({
         title: "Success",
         description: "All notifications marked as read",
@@ -172,10 +209,10 @@ export function NotificationSystem() {
   // Format timestamp to readable date
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "Unknown date";
-    
+
     const now = new Date();
     const date = new Date(timestamp);
-    
+
     const diffInSeconds = Math.floor((now - date) / 1000);
     const diffInMinutes = Math.floor(diffInSeconds / 60);
     const diffInHours = Math.floor(diffInMinutes / 60);
@@ -197,15 +234,15 @@ export function NotificationSystem() {
   // Get notification icon based on type
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'low_stock':
+      case "low_stock":
         return <AlertTriangle className="h-4 w-4 text-amber-500" />;
-      case 'out_of_stock':
+      case "out_of_stock":
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
-      case 'inventory_update':
+      case "inventory_update":
         return <RefreshCw className="h-4 w-4 text-blue-500" />;
-      case 'new_product':
+      case "new_product":
         return <PlusCircle className="h-4 w-4 text-green-500" />;
-      case 'bulk_update':
+      case "bulk_update":
         return <Database className="h-4 w-4 text-purple-500" />;
       // Sale notification case has been removed
       default:
@@ -224,9 +261,9 @@ export function NotificationSystem() {
         </div>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={markAllAsRead}
               className="flex items-center gap-1"
             >
@@ -256,7 +293,7 @@ export function NotificationSystem() {
               )}
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="all">
             <ScrollArea className="h-[680px]">
               {loading ? (
@@ -312,7 +349,7 @@ export function NotificationSystem() {
               )}
             </ScrollArea>
           </TabsContent>
-          
+
           <TabsContent value="unread">
             <ScrollArea className="h-[680px]">
               {loading ? (
@@ -359,7 +396,9 @@ export function NotificationSystem() {
               ) : (
                 <div className="flex flex-col items-center justify-center h-40 text-center">
                   <CheckCheck className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">No unread notifications</p>
+                  <p className="text-muted-foreground">
+                    No unread notifications
+                  </p>
                 </div>
               )}
             </ScrollArea>

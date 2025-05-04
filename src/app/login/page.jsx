@@ -3,7 +3,7 @@
 import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import { auth } from "@/firebase/dbConfig";
-import { Eye, EyeOff, Package } from "lucide-react";
+import { Eye, EyeOff, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -261,7 +261,14 @@ export default function Login() {
             onClick={handleLogin}
             disabled={isLoading}
           >
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
           </Button>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

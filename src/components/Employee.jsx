@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreVertical, Pencil, Trash2, Plus, Search } from "lucide-react";
+import {
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Plus,
+  Search,
+  Loader2,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -48,6 +55,7 @@ import {
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Employee() {
   const { toast } = useToast();
@@ -105,9 +113,17 @@ export default function Employee() {
       }
     };
 
-    if (auth.currentUser) {
-      fetchEmployeesAndInvitations();
-    }
+    // Listen to auth state changes to handle page refreshes properly
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchEmployeesAndInvitations();
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Clean up the subscription
+    return () => unsubscribe();
   }, []);
 
   const handleInviteEmployee = async (employeeData) => {
@@ -322,149 +338,159 @@ export default function Employee() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
-        <div className="min-w-[600px]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.length === 0 ? (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center rounded-md border p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-4" />
+        </div>
+      ) : (
+        <div className="rounded-md border overflow-x-auto">
+          <div className="min-w-[600px]">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-gray-400 py-28"
-                  >
-                    No employees or pending invitations found.
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.userName}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.role}</TableCell>
-                    <TableCell>{getStatusBadge(user.status)}</TableCell>
-                    <TableCell>
-                      {user.status === "pending_invite" ? (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleCancelInvitation(user.id)}
-                        >
-                          Cancel Invitation
-                        </Button>
-                      ) : (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent align="end" className="w-36 p-2 ">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button
-                                  className="w-full flex items-center justify-start"
-                                  variant="ghost"
-                                  size="sm"
-                                >
-                                  <Pencil className="h-4 w-4" /> Edit
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Edit Permissions</DialogTitle>
-                                  <DialogDescription>
-                                    Change employee roles and permissions.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleUpdateRole}>
-                                  <div className="space-y-4">
-                                    <div>
-                                      <Label htmlFor="role">Role</Label>
-                                      <Select
-                                        value={editForm.role || user.role || ""}
-                                        onValueChange={(value) =>
-                                          setEditForm((prev) => ({
-                                            ...prev,
-                                            id: user.id,
-                                            role: value,
-                                          }))
-                                        }
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select a role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="manager">
-                                            Manager
-                                          </SelectItem>
-                                          <SelectItem value="cashier">
-                                            Cashier
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <DialogFooter>
-                                      <Button type="submit">Update Role</Button>
-                                    </DialogFooter>
-                                  </div>
-                                </form>
-                              </DialogContent>
-                            </Dialog>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button
-                                  className="w-full flex items-center justify-start text-red-500"
-                                  variant="ghost"
-                                  size="sm"
-                                >
-                                  <Trash2 className="h-4 w-4" /> Delete
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Confirm Delete</DialogTitle>
-                                  <DialogDescription>
-                                    Are you sure you want to remove this
-                                    employee? This action cannot be undone.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <DialogFooter>
-                                  <DialogClose asChild>
-                                    <Button variant="outline">Cancel</Button>
-                                  </DialogClose>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={() => {
-                                      handleDeleteUser(user.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          </PopoverContent>
-                        </Popover>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-gray-400 py-28"
+                    >
+                      No employees or pending invitations found.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        {user.userName}
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.role}</TableCell>
+                      <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>
+                        {user.status === "pending_invite" ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleCancelInvitation(user.id)}
+                          >
+                            Cancel Invitation
+                          </Button>
+                        ) : (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-36 p-2 ">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    className="w-full flex items-center justify-start"
+                                    variant="ghost"
+                                    size="sm"
+                                  >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Edit Permissions</DialogTitle>
+                                    <DialogDescription>
+                                      Change employee roles and permissions.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <form onSubmit={handleUpdateRole}>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <Label htmlFor="role">Role</Label>
+                                        <Select
+                                          value={
+                                            editForm.role || user.role || ""
+                                          }
+                                          onValueChange={(value) =>
+                                            setEditForm((prev) => ({
+                                              ...prev,
+                                              id: user.id,
+                                              role: value,
+                                            }))
+                                          }
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select a role" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="manager">
+                                              Manager
+                                            </SelectItem>
+                                            <SelectItem value="cashier">
+                                              Cashier
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <DialogFooter>
+                                        <Button type="submit">
+                                          Update Role
+                                        </Button>
+                                      </DialogFooter>
+                                    </div>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    className="w-full flex items-center justify-start text-red-500"
+                                    variant="ghost"
+                                    size="sm"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Confirm Delete</DialogTitle>
+                                    <DialogDescription>
+                                      Are you sure you want to remove this
+                                      employee? This action cannot be undone.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <DialogFooter>
+                                    <DialogClose asChild>
+                                      <Button variant="outline">Cancel</Button>
+                                    </DialogClose>
+                                    <Button
+                                      variant="destructive"
+                                      onClick={() => {
+                                        handleDeleteUser(user.id);
+                                      }}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

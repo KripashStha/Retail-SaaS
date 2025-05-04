@@ -52,7 +52,7 @@ export default function BusinessSetup() {
         description: "Business account created successfully"
       });
 
-      router.push("/admin");
+      router.push("/admin/dashboard");
     } catch (error) {
       console.error("Error creating business:", error);
       

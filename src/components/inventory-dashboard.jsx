@@ -51,19 +51,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useCurrency } from "@/contexts/currency-context";
 import { format, subDays } from "date-fns";
-import { collection, query, orderBy, limit, getDocs, where } from "firebase/firestore";
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+  where,
+} from "firebase/firestore";
 import { db } from "@/firebase/dbConfig";
 
 // Format timestamp to readable format
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "Unknown date";
-  
+
   // Try to convert to a Date object if it's not already
   let date;
-  
+
   try {
     // Handle Firestore timestamp objects
-    if (timestamp && typeof timestamp.toDate === 'function') {
+    if (timestamp && typeof timestamp.toDate === "function") {
       date = timestamp.toDate();
     }
     // Handle JS Date objects
@@ -71,18 +78,24 @@ const formatTimestamp = (timestamp) => {
       date = timestamp;
     }
     // Handle timestamp numbers (milliseconds since epoch)
-    else if (typeof timestamp === 'number') {
+    else if (typeof timestamp === "number") {
       date = new Date(timestamp);
     }
     // Handle timestamp objects with seconds and nanoseconds
-    else if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
-      date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+    else if (
+      timestamp &&
+      typeof timestamp === "object" &&
+      "seconds" in timestamp
+    ) {
+      date = new Date(
+        timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000
+      );
     }
     // Handle timestamp strings (ISO format)
-    else if (typeof timestamp === 'string') {
+    else if (typeof timestamp === "string") {
       // Try parsing as ISO date first
       date = new Date(timestamp);
-      
+
       // If invalid, try parsing as seconds since epoch
       if (isNaN(date.getTime())) {
         const seconds = parseFloat(timestamp);
@@ -90,54 +103,58 @@ const formatTimestamp = (timestamp) => {
           date = new Date(seconds * 1000); // Convert seconds to milliseconds
         }
       }
-    }
-    else {
+    } else {
       console.error("Unknown timestamp format:", timestamp);
       return "Invalid date";
     }
-    
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
       console.error("Invalid date object created from timestamp:", timestamp);
       return "Invalid date";
     }
-    
+
     const now = new Date();
     const diffMs = now - date;
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
-    
+
     // If it's within the last minute
     if (diffSec < 60) {
       return diffSec <= 5 ? "Just now" : `${diffSec} seconds ago`;
     }
-    
+
     // If it's within the last hour
     if (diffMin < 60) {
-      return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+      return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
     }
-    
+
     // If it's within the last 24 hours
     if (diffHour < 24) {
-      return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
+      return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
     }
-    
+
     // If it's yesterday
     if (diffDay === 1) {
-      return `Yesterday at ${format(date, 'h:mm a')}`;
+      return `Yesterday at ${format(date, "h:mm a")}`;
     }
-    
+
     // If it's within the last 7 days
     if (diffDay < 7) {
-      return format(date, 'EEEE') + ` at ${format(date, 'h:mm a')}`;
+      return format(date, "EEEE") + ` at ${format(date, "h:mm a")}`;
     }
-    
+
     // Otherwise show the full date
-    return format(date, 'MMM d, yyyy • h:mm a');
+    return format(date, "MMM d, yyyy • h:mm a");
   } catch (e) {
-    console.error("Error formatting timestamp:", e, "Original value:", timestamp);
+    console.error(
+      "Error formatting timestamp:",
+      e,
+      "Original value:",
+      timestamp
+    );
     return "Invalid date";
   }
 };
@@ -171,7 +188,8 @@ const COLORS = [
 ];
 
 export function InventoryDashboard() {
-  const { products, loading, error, getLowStockProducts, businessId } = useInventory();
+  const { products, loading, error, getLowStockProducts, businessId } =
+    useInventory();
   const { formatCurrency, convertCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("overview");
   const [timeRange, setTimeRange] = useState("week");
@@ -211,26 +229,30 @@ export function InventoryDashboard() {
 
   // Fetch real sales data from Firestore
   const fetchSalesData = async (businessId) => {
-    try {      
+    try {
       if (!businessId) {
         console.error("No business ID available for filtering sales data");
-        return { 
-          salesTrend: generateDateLabels().map(date => ({ 
-            date, 
-            sales: 0, 
-            value: 0 
-          })), 
-          totalSalesValue: 0 
+        return {
+          salesTrend: generateDateLabels().map((date) => ({
+            date,
+            sales: 0,
+            value: 0,
+          })),
+          totalSalesValue: 0,
         };
       }
-      
-      const daysToShow = 
-        timeRange === "week" ? 7 : 
-        timeRange === "month" ? 30 : 
-        timeRange === "quarter" ? 90 : 365;
-        
+
+      const daysToShow =
+        timeRange === "week"
+          ? 7
+          : timeRange === "month"
+          ? 30
+          : timeRange === "quarter"
+          ? 90
+          : 365;
+
       const startDate = subDays(new Date(), daysToShow);
-      
+
       // Modified query approach to avoid composite index requirement
       // First filter by businessId only
       const salesCollection = collection(db, "sales");
@@ -238,61 +260,66 @@ export function InventoryDashboard() {
         salesCollection,
         where("businessId", "==", businessId)
       );
-      
+
       const querySnapshot = await getDocs(salesQuery);
-      
+
       // Create a map to store sales by date
       const salesByDate = {};
       const dateLabels = generateDateLabels();
-      
+
       // Initialize all dates with zero values
-      dateLabels.forEach(date => {
+      dateLabels.forEach((date) => {
         salesByDate[date] = { date, sales: 0, value: 0 };
       });
-      
+
       // Calculate total sales value
       let totalSalesValue = 0;
-      
+
       // Process sales data and filter by date in memory
-      querySnapshot.forEach(doc => {
+      querySnapshot.forEach((doc) => {
         const saleData = doc.data();
-        
+
         // Safely handle timestamp conversion
-        const saleDate = saleData.timestamp ? 
-          (typeof saleData.timestamp.toDate === 'function' ? 
-            saleData.timestamp.toDate() : new Date(saleData.timestamp)) : new Date();
-        
+        const saleDate = saleData.timestamp
+          ? typeof saleData.timestamp.toDate === "function"
+            ? saleData.timestamp.toDate()
+            : new Date(saleData.timestamp)
+          : new Date();
+
         // Filter by date in memory instead of in the query
         if (saleDate >= startDate) {
           const dateKey = format(saleDate, "MMM dd");
-          
+
           if (salesByDate[dateKey]) {
             // Count items quantity
-            const itemsCount = saleData.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-            
+            const itemsCount = saleData.items.reduce(
+              (sum, item) => sum + (item.quantity || 0),
+              0
+            );
+
             // Update sales for the date
             salesByDate[dateKey].sales += itemsCount;
             salesByDate[dateKey].value += saleData.total || 0;
-            
+
             // Add to total sales value
             totalSalesValue += saleData.total || 0;
           }
         }
       });
-      
+
       // Convert map to array for the chart
       const salesTrend = Object.values(salesByDate);
-      
+
       return { salesTrend, totalSalesValue };
     } catch (error) {
       console.error("Error fetching sales data:", error);
-      return { 
-        salesTrend: generateDateLabels().map(date => ({ 
-          date, 
-          sales: 0, 
-          value: 0 
-        })), 
-        totalSalesValue: 0 
+      return {
+        salesTrend: generateDateLabels().map((date) => ({
+          date,
+          sales: 0,
+          value: 0,
+        })),
+        totalSalesValue: 0,
       };
     }
   };
@@ -303,28 +330,29 @@ export function InventoryDashboard() {
       if (!businessId) {
         return [];
       }
-      
+
       const salesCollection = collection(db, "sales");
       const salesQuery = query(
         salesCollection,
         where("businessId", "==", businessId)
       );
-      
+
       const salesSnapshot = await getDocs(salesQuery);
-      
+
       // Create a map to track sales counts by product
       const productSalesMap = {};
-      
+
       // Process all sales data
-      salesSnapshot.forEach(doc => {
+      salesSnapshot.forEach((doc) => {
         const saleData = doc.data();
-        
+
         // Check if the document has items array
         if (saleData.items && Array.isArray(saleData.items)) {
-          saleData.items.forEach(item => {
+          saleData.items.forEach((item) => {
             // Try to use product name as key if no productId
-            const key = item.productId || item.name || item.id || JSON.stringify(item);
-            
+            const key =
+              item.productId || item.name || item.id || JSON.stringify(item);
+
             if (key) {
               if (!productSalesMap[key]) {
                 productSalesMap[key] = {
@@ -333,25 +361,25 @@ export function InventoryDashboard() {
                   category: item.category || "Uncategorized",
                   price: parseFloat(item.price) || 0,
                   totalSold: 0,
-                  totalRevenue: 0
+                  totalRevenue: 0,
                 };
               }
-              
+
               const quantity = parseInt(item.quantity) || 1;
               const price = parseFloat(item.price) || 0;
-              
+
               productSalesMap[key].totalSold += quantity;
-              productSalesMap[key].totalRevenue += (price * quantity);
+              productSalesMap[key].totalRevenue += price * quantity;
             }
           });
         }
       });
-      
+
       // Convert map to array and sort by total sold (descending)
       const topSellingProducts = Object.values(productSalesMap)
         .sort((a, b) => b.totalSold - a.totalSold)
         .slice(0, 5);
-        
+
       return topSellingProducts;
     } catch (error) {
       console.error("Error fetching top selling products:", error);
@@ -363,51 +391,51 @@ export function InventoryDashboard() {
   const fetchRecentActivities = async (businessId) => {
     try {
       if (!businessId) {
-        console.error("No business ID available for filtering activities");
         return [];
       }
-      
-      console.log("Fetching recent activities with business ID:", businessId);
-      
+
       // Initialize the recentProductUpdates array
       const recentProductUpdates = [];
-      
+
       // Fetch product updates
       const productUpdatesQuery = query(
         collection(db, "products"),
         where("businessId", "==", businessId)
       );
-      
+
       // Fetch recent sales with improved timestamp handling
       const salesQuery = query(
         collection(db, "sales"),
         where("businessId", "==", businessId)
       );
-      
-      console.log("Running sales query...");
+
       const salesSnapshot = await getDocs(salesQuery);
-      console.log(`Found ${salesSnapshot.docs.length} sales records`);
-      
+
       // Process all sales with better timestamp handling
       const allSales = [];
-      
+
       // Process all sales with better timestamp handling
-      salesSnapshot.docs.forEach(doc => {
+      salesSnapshot.docs.forEach((doc) => {
         const data = doc.data();
-        console.log("Processing sale record:", doc.id, data);
         let timestamp;
-        
+
         // Safely handle the Firestore timestamp conversion
         if (data.timestamp) {
-          if (typeof data.timestamp.toDate === 'function') {
+          if (typeof data.timestamp.toDate === "function") {
             timestamp = data.timestamp.toDate();
           } else if (data.timestamp instanceof Date) {
             timestamp = data.timestamp;
-          } else if (typeof data.timestamp === 'number') {
+          } else if (typeof data.timestamp === "number") {
             timestamp = new Date(data.timestamp);
-          } else if (typeof data.timestamp === 'object' && 'seconds' in data.timestamp) {
-            timestamp = new Date(data.timestamp.seconds * 1000 + (data.timestamp.nanoseconds || 0) / 1000000);
-          } else if (typeof data.timestamp === 'string') {
+          } else if (
+            typeof data.timestamp === "object" &&
+            "seconds" in data.timestamp
+          ) {
+            timestamp = new Date(
+              data.timestamp.seconds * 1000 +
+                (data.timestamp.nanoseconds || 0) / 1000000
+            );
+          } else if (typeof data.timestamp === "string") {
             timestamp = new Date(data.timestamp);
           } else {
             timestamp = new Date();
@@ -416,25 +444,25 @@ export function InventoryDashboard() {
         } else {
           timestamp = new Date();
         }
-        
+
         // Validate timestamp
         if (isNaN(timestamp.getTime())) {
           console.error("Invalid sales timestamp:", data.timestamp);
           timestamp = new Date(); // Use current date as fallback
         }
-          
+
         allSales.push({
           id: doc.id,
-          type: 'sale',
+          type: "sale",
           name: `Sale #${doc.id.substring(0, 5)}`,
           timestamp: timestamp,
           details: {
             items: data.items?.length || 0,
-            total: data.total || 0
-          }
+            total: data.total || 0,
+          },
         });
       });
-      
+
       // Sort sales by timestamp and take only 5 most recent
       const recentSales = allSales
         .sort((a, b) => {
@@ -444,9 +472,7 @@ export function InventoryDashboard() {
           return timeB - timeA;
         })
         .slice(0, 5);
-      
-      console.log("Recent sales after processing:", recentSales);
-      
+
       // Combine and sort by timestamp
       const allActivities = [...recentProductUpdates, ...recentSales]
         .sort((a, b) => {
@@ -456,10 +482,7 @@ export function InventoryDashboard() {
           return timeB - timeA;
         })
         .slice(0, 8);
-      
-      console.log("All activities after combining:", allActivities);
-      console.log("Sales activities:", allActivities.filter(a => a.type === 'sale'));
-        
+
       return allActivities;
     } catch (error) {
       console.error("Error fetching recent activities:", error);
@@ -467,11 +490,44 @@ export function InventoryDashboard() {
     }
   };
 
+  // Render activity item
+  const renderActivityItem = (activity) => {
+    // Ensure timestamp is formatted to string before rendering
+    const formattedTime =
+      typeof activity.timestamp === "object"
+        ? formatTimestamp(activity.timestamp)
+        : formatTimestamp(new Date());
+
+    return (
+      <div key={activity.id} className="flex items-start space-x-3 py-2">
+        {activity.type === "product" ? (
+          <div className="bg-indigo-100 p-2 rounded-md">
+            <Package className="h-4 w-4 text-indigo-600" />
+          </div>
+        ) : (
+          <div className="bg-green-100 p-2 rounded-md">
+            <ShoppingCart className="h-4 w-4 text-green-600" />
+          </div>
+        )}
+        <div className="flex-1 space-y-1">
+          <p className="text-sm font-medium leading-none">{activity.name}</p>
+          <p className="text-xs text-muted-foreground">{formattedTime}</p>
+          {activity.type === "sale" && (
+            <p className="text-xs">
+              {activity.details.items} items •{" "}
+              <CurrencyFormatter value={activity.details.total} />
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Calculate dashboard metrics whenever products change
   useEffect(() => {
     const fetchData = async () => {
       if (loading) return; // Don't fetch data while loading
-      
+
       try {
         if (products.length > 0) {
           // Calculate total products
@@ -495,7 +551,9 @@ export function InventoryDashboard() {
               product.quantity > 0 && product.quantity <= product.threshold
           );
 
-          const outOfStock = products.filter((product) => product.quantity === 0);
+          const outOfStock = products.filter(
+            (product) => product.quantity === 0
+          );
 
           // Stock distribution
           const stockDistribution = {
@@ -525,8 +583,10 @@ export function InventoryDashboard() {
           );
 
           // Fetch sales data
-          const { salesTrend, totalSalesValue } = await fetchSalesData(businessId);
-          
+          const { salesTrend, totalSalesValue } = await fetchSalesData(
+            businessId
+          );
+
           // Fetch recent activities
           const recentActivities = await fetchRecentActivities(businessId);
           setRecentActivity(recentActivities);
@@ -583,7 +643,7 @@ export function InventoryDashboard() {
         console.error("Error calculating dashboard metrics:", error);
       }
     };
-    
+
     fetchData();
   }, [products, timeRange, businessId, loading]);
 
@@ -635,8 +695,9 @@ export function InventoryDashboard() {
                 <Package className="h-4 w-4 text-indigo-600" />
               </CardHeader>
               <CardContent className="relative">
-                <div className="text-3xl font-bold break-words">{stats.totalProducts}</div>
-              
+                <div className="text-3xl font-bold break-words">
+                  {stats.totalProducts}
+                </div>
               </CardContent>
             </Card>
 
@@ -652,7 +713,6 @@ export function InventoryDashboard() {
                 <div className="text-3xl font-bold break-words min-w-0">
                   <CurrencyFormatter value={stats.totalValue} />
                 </div>
-               
               </CardContent>
             </Card>
 
@@ -668,7 +728,6 @@ export function InventoryDashboard() {
                 <div className="text-3xl font-bold break-words min-w-0">
                   <CurrencyFormatter value={stats.totalSalesValue} />
                 </div>
-                
               </CardContent>
             </Card>
 
@@ -775,12 +834,15 @@ export function InventoryDashboard() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value) => [
-                          `${formatCurrency(convertCurrency(value, 'USD'))}`,
+                          `${formatCurrency(convertCurrency(value, "USD"))}`,
                           "Sales",
                         ]}
                         labelFormatter={(label) => `Date: ${label}`}
-                        contentStyle={{ color: '#111', backgroundColor: '#fff' }}
-                        labelStyle={{ color: '#111' }}
+                        contentStyle={{
+                          color: "#111",
+                          backgroundColor: "#fff",
+                        }}
+                        labelStyle={{ color: "#111" }}
                       />
                       <Area
                         type="monotone"
@@ -987,7 +1049,7 @@ export function InventoryDashboard() {
                   {recentActivity.length > 0 ? (
                     <div className="space-y-0 p-1">
                       {recentActivity
-                        .filter(activity => activity.type === 'sale')
+                        .filter((activity) => activity.type === "sale")
                         .map((activity) => (
                           <div
                             key={activity.id}
@@ -995,11 +1057,9 @@ export function InventoryDashboard() {
                           >
                             {/* Activity Icon */}
                             <div className="rounded-full p-2 bg-indigo-100 dark:bg-indigo-900/20">
-                              <ShoppingCart
-                                className="h-4 w-4 text-indigo-600 dark:text-indigo-400"
-                              />
+                              <ShoppingCart className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                             </div>
-                            
+
                             {/* Activity Content */}
                             <div className="flex-1 space-y-1">
                               <div className="text-sm font-medium leading-none flex items-center">
@@ -1011,18 +1071,21 @@ export function InventoryDashboard() {
                                   Sale
                                 </Badge>
                               </div>
-                              
+
                               <p className="text-xs text-muted-foreground">
-                                {activity.details.items} items sold for <CurrencyFormatter value={activity.details.total} />
+                                {activity.details.items} items sold for{" "}
+                                <CurrencyFormatter
+                                  value={activity.details.total}
+                                />
                               </p>
-                              
+
                               {/* Activity Timestamp */}
                               <p className="text-xs text-muted-foreground flex items-center mt-1 px-2 py-1 rounded">
                                 <Clock className="h-3 w-3 mr-1" />
                                 {formatTimestamp(activity.timestamp)}
                               </p>
                             </div>
-                            
+
                             {/* Activity Value */}
                             <div>
                               <CurrencyFormatter
@@ -1032,13 +1095,15 @@ export function InventoryDashboard() {
                             </div>
                           </div>
                         ))}
-                        {recentActivity.filter(activity => activity.type === 'sale').length === 0 && (
-                          <div className="text-center py-8">
-                            <p className="text-muted-foreground">
-                              No recent sales found
-                            </p>
-                          </div>
-                        )}
+                      {recentActivity.filter(
+                        (activity) => activity.type === "sale"
+                      ).length === 0 && (
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground">
+                            No recent sales found
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-8">
@@ -1082,8 +1147,9 @@ export function InventoryDashboard() {
                       {lowStockProducts.map((product) => (
                         <TableRow key={product.id}>
                           <TableCell>
-                            <div className="font-medium py-2">{product.name}</div>
-                          
+                            <div className="font-medium py-2">
+                              {product.name}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {product.category || "Uncategorized"}
@@ -1150,8 +1216,11 @@ export function InventoryDashboard() {
                       <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value) => [`${value} items`, "Count"]}
-                        contentStyle={{ color: '#111', backgroundColor: '#fff' }}
-                        labelStyle={{ color: '#111', fontWeight: 'bold' }}
+                        contentStyle={{
+                          color: "#111",
+                          backgroundColor: "#fff",
+                        }}
+                        labelStyle={{ color: "#111", fontWeight: "bold" }}
                       />
                       <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]}>
                         {stats.categoryDistribution.map((entry, index) => (
@@ -1166,7 +1235,7 @@ export function InventoryDashboard() {
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Top Selling Products Section */}
             <Card className="md:col-span-2 mt-4">
               <CardHeader className="pb-2">
@@ -1193,8 +1262,9 @@ export function InventoryDashboard() {
                       topSellingProducts.map((product) => (
                         <TableRow key={product.id}>
                           <TableCell>
-                            <div className="font-medium py-2">{product.name}</div>
-                            
+                            <div className="font-medium py-2">
+                              {product.name}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {product.category || "Uncategorized"}
@@ -1220,8 +1290,6 @@ export function InventoryDashboard() {
                 </Table>
               </CardContent>
             </Card>
-
-           
           </div>
         </TabsContent>
       </Tabs>
