@@ -7,9 +7,12 @@ export function PageTitle({ businessName }) {
   const currentView = pathname.split("/").pop();
 
   return (
-    <h2 className="text-2xl pl-14 sm:pl-0 sm:text-3xl font-bold tracking-tight break-words">
-      {businessName?.name || ""}{" "}
-      {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-    </h2>
+    <div className="py-4 md:px-8 md:pt-8 overflow-hidden">
+      <h2 className="text-2xl md:text-3xl font-bold tracking-tight break-words pr-4">
+        {businessName?.name || ""}
+        {businessName?.name && <span className="md:inline"> </span>}
+        {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+      </h2>
+    </div>
   );
 }

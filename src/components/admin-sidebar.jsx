@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Package,
@@ -23,6 +23,16 @@ export function AdminSidebar({ businessName }) {
   const pathname = usePathname();
   const currentView = pathname.split("/").pop();
 
+  // Listen for toggle events from the layout component
+  useEffect(() => {
+    const handleToggle = () => {
+      setSidebarOpen((prev) => !prev);
+    };
+
+    document.addEventListener("toggleSidebar", handleToggle);
+    return () => document.removeEventListener("toggleSidebar", handleToggle);
+  }, []);
+
   return (
     <>
       {/* Sidebar overlay for mobile */}
@@ -34,15 +44,15 @@ export function AdminSidebar({ businessName }) {
         }
         onClick={() => setSidebarOpen(false)}
       />
-
-      {/* Sidebar */}
+      {/* Sidebar */}{" "}
       <div
-        className={`fixed z-50 inset-y-0 left-0 w-64 transform bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col justify-between transition-transform duration-200 ease-in-out
+        className={`fixed z-50 inset-y-0 left-0 w-64 max-w-full transform bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col justify-between transition-transform duration-200 ease-in-out overflow-hidden
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           md:static md:translate-x-0 md:flex md:w-64`}
       >
+        {" "}
         {/* Sidebar Header */}
-        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <Package className="h-6 w-6 text-indigo-600" />
           <span className="font-semibold text-xl text-indigo-600 dark:text-indigo-400 ">
             Easy Inventory
@@ -55,17 +65,17 @@ export function AdminSidebar({ businessName }) {
           >
             <X className="h-6 w-6" />
           </button>
-        </div>
+        </div>{" "}
         {/* Main Navigation */}
-        <div className="px-3 py-4 flex-1 overflow-y-auto">
+        <div className="px-2 md:px-3 py-4 flex-1 overflow-y-auto overflow-x-hidden">
           <nav className="space-y-6">
             {/* Dashboard Section */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 md:px-3 mb-2">
                 Main
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/dashboard">
+                <Link href="/admin/dashboard" className="block">
                   <Button
                     variant={currentView === "dashboard" ? "default" : "ghost"}
                     className={cn(
@@ -83,11 +93,11 @@ export function AdminSidebar({ businessName }) {
 
             {/* Inventory Section */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 md:px-3 mb-2">
                 Inventory
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/inventory">
+                <Link href="/admin/inventory" className="block">
                   <Button
                     variant={currentView === "inventory" ? "default" : "ghost"}
                     className={cn(
@@ -100,7 +110,7 @@ export function AdminSidebar({ businessName }) {
                     <span>Inventory</span>
                   </Button>
                 </Link>
-                <Link href="/admin/pos">
+                <Link href="/admin/pos" className="block">
                   <Button
                     variant={currentView === "pos" ? "default" : "ghost"}
                     className={cn(
@@ -113,7 +123,7 @@ export function AdminSidebar({ businessName }) {
                     <span>Point of Sale</span>
                   </Button>
                 </Link>
-                <Link href="/admin/sales-history">
+                <Link href="/admin/sales-history" className="block">
                   <Button
                     variant={
                       currentView === "sales-history" ? "default" : "ghost"
@@ -133,11 +143,12 @@ export function AdminSidebar({ businessName }) {
 
             {/* Management Section */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
+              {" "}
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 md:px-3 mb-2">
                 Management
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/employee">
+                <Link href="/admin/employee" className="block">
                   <Button
                     variant={currentView === "employee" ? "default" : "ghost"}
                     className={cn(
@@ -150,7 +161,7 @@ export function AdminSidebar({ businessName }) {
                     <span>Employees</span>
                   </Button>
                 </Link>
-                <Link href="/admin/notifications">
+                <Link href="/admin/notifications" className="block">
                   <Button
                     variant={
                       currentView === "notifications" ? "default" : "ghost"
@@ -170,11 +181,12 @@ export function AdminSidebar({ businessName }) {
 
             {/* Settings Section */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
+              {" "}
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 md:px-3 mb-2">
                 Settings
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/settings">
+                <Link href="/admin/settings" className="block">
                   <Button
                     variant={currentView === "settings" ? "default" : "ghost"}
                     className={cn(
@@ -190,26 +202,14 @@ export function AdminSidebar({ businessName }) {
               </div>
             </div>
           </nav>
-        </div>
-
+        </div>{" "}
         {/* Bottom Section */}
-        <div className="w-full border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="px-3 py-4">
+        <div className="w-full border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+          <div className="px-2 md:px-3 py-4">
             <Profile />
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu Toggle (Outside sidebar) */}
-      {!sidebarOpen && (
-        <button
-          className="p-2 rounded md:hidden bg-white dark:bg-gray-900 shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 fixed top-4 left-4 z-30"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-        >
-          <Menu className="h-6 w-6 text-indigo-600" />
-        </button>
-      )}
     </>
   );
 }
