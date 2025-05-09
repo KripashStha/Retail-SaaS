@@ -7,7 +7,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -27,20 +26,13 @@ import {
   BarChart3,
   Zap,
   TrendingUp,
-  TrendingDown,
-  ArrowRight,
   Clock,
   Layers,
-  RefreshCw,
   ShoppingBag,
-  ChevronRight,
   PieChart,
   CheckCircle2,
   XCircle,
   Tag,
-  Calendar,
-  Plus,
-  Edit,
   ShoppingCart,
 } from "lucide-react";
 import { useInventory } from "@/contexts/inventory-context";
@@ -490,38 +482,38 @@ export function InventoryDashboard() {
     }
   };
 
-  // Render activity item
-  const renderActivityItem = (activity) => {
-    // Ensure timestamp is formatted to string before rendering
-    const formattedTime =
-      typeof activity.timestamp === "object"
-        ? formatTimestamp(activity.timestamp)
-        : formatTimestamp(new Date());
+  // // Render activity item
+  // const renderActivityItem = (activity) => {
+  //   // Ensure timestamp is formatted to string before rendering
+  //   const formattedTime =
+  //     typeof activity.timestamp === "object"
+  //       ? formatTimestamp(activity.timestamp)
+  //       : formatTimestamp(new Date());
 
-    return (
-      <div key={activity.id} className="flex items-start space-x-3 py-2">
-        {activity.type === "product" ? (
-          <div className="bg-indigo-100 p-2 rounded-md">
-            <Package className="h-4 w-4 text-indigo-600" />
-          </div>
-        ) : (
-          <div className="bg-green-100 p-2 rounded-md">
-            <ShoppingCart className="h-4 w-4 text-green-600" />
-          </div>
-        )}
-        <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium leading-none">{activity.name}</p>
-          <p className="text-xs text-muted-foreground">{formattedTime}</p>
-          {activity.type === "sale" && (
-            <p className="text-xs">
-              {activity.details.items} items •{" "}
-              <CurrencyFormatter value={activity.details.total} />
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  };
+  //   return (
+  //     <div key={activity.id} className="flex items-start space-x-3 py-2">
+  //       {activity.type === "product" ? (
+  //         <div className="bg-indigo-100 p-2 rounded-md">
+  //           <Package className="h-4 w-4 text-indigo-600" />
+  //         </div>
+  //       ) : (
+  //         <div className="bg-green-100 p-2 rounded-md">
+  //           <ShoppingCart className="h-4 w-4 text-green-600" />
+  //         </div>
+  //       )}
+  //       <div className="flex-1 space-y-1">
+  //         <p className="text-sm font-medium leading-none">{activity.name}</p>
+  //         <p className="text-xs text-muted-foreground">{formattedTime}</p>
+  //         {activity.type === "sale" && (
+  //           <p className="text-xs">
+  //             {activity.details.items} items •{" "}
+  //             <CurrencyFormatter value={activity.details.total} />
+  //           </p>
+  //         )}
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
   // Calculate dashboard metrics whenever products change
   useEffect(() => {
@@ -676,8 +668,8 @@ export function InventoryDashboard() {
               Overview
             </TabsTrigger>
             <TabsTrigger value="inventory">
-              <Layers className="mr-2 h-4 w-4" />
-              Inventory Health
+              <Zap className="mr-2 h-4 w-4" />
+              Insights
             </TabsTrigger>
           </TabsList>
         </div>

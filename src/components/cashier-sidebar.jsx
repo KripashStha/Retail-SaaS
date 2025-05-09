@@ -13,12 +13,11 @@ import {
   Receipt,
 } from "lucide-react";
 import Profile from "@/components/Profile";
-import { NotificationBadge } from "@/components/notification-badge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function ClientSidebar({ businessName }) {
+export function CashierSidebar({ businessName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const currentView = pathname.split("/").pop();
@@ -65,7 +64,7 @@ export function ClientSidebar({ businessName }) {
                 Main
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/dashboard">
+                <Link href="/cashier/dashboard">
                   <Button
                     variant={currentView === "dashboard" ? "default" : "ghost"}
                     className={cn(
@@ -75,7 +74,7 @@ export function ClientSidebar({ businessName }) {
                     )}
                   >
                     <LayoutDashboard className="h-5 w-5 mr-3" />
-                    <span>Dashboard</span>
+                    <span>Sales Summary</span>
                   </Button>
                 </Link>
               </div>
@@ -87,7 +86,7 @@ export function ClientSidebar({ businessName }) {
                 Inventory
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/inventory">
+                <Link href="/cashier/inventory">
                   <Button
                     variant={currentView === "inventory" ? "default" : "ghost"}
                     className={cn(
@@ -100,7 +99,7 @@ export function ClientSidebar({ businessName }) {
                     <span>Inventory</span>
                   </Button>
                 </Link>
-                <Link href="/admin/pos">
+                <Link href="/cashier/pos">
                   <Button
                     variant={currentView === "pos" ? "default" : "ghost"}
                     className={cn(
@@ -113,7 +112,7 @@ export function ClientSidebar({ businessName }) {
                     <span>Point of Sale</span>
                   </Button>
                 </Link>
-                <Link href="/admin/sales-history">
+                <Link href="/cashier/sales-history">
                   <Button
                     variant={
                       currentView === "sales-history" ? "default" : "ghost"
@@ -131,50 +130,13 @@ export function ClientSidebar({ businessName }) {
               </div>
             </div>
 
-            {/* Management Section */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
-                Management
-              </h3>
-              <div className="space-y-1">
-                <Link href="/admin/employee">
-                  <Button
-                    variant={currentView === "employee" ? "default" : "ghost"}
-                    className={cn(
-                      "w-full justify-start text-base hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-gray-800 dark:hover:text-indigo-300",
-                      currentView === "employee" &&
-                        "bg-indigo-600 text-white hover:bg-indigo-600/90 hover:text-white dark:bg-indigo-700 dark:text-white"
-                    )}
-                  >
-                    <Users className="h-5 w-5 mr-3" />
-                    <span>Employees</span>
-                  </Button>
-                </Link>
-                <Link href="/admin/notifications">
-                  <Button
-                    variant={
-                      currentView === "notifications" ? "default" : "ghost"
-                    }
-                    className={cn(
-                      "w-full justify-start text-base hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-gray-800 dark:hover:text-indigo-300",
-                      currentView === "notifications" &&
-                        "bg-indigo-600 text-white hover:bg-indigo-600/90 hover:text-white dark:bg-indigo-700 dark:text-white"
-                    )}
-                  >
-                    <NotificationBadge />
-                    <span>Notifications</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
             {/* Settings Section */}
             <div>
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase px-3 mb-2">
                 Settings
               </h3>
               <div className="space-y-1">
-                <Link href="/admin/settings">
+                <Link href="/cashier/settings">
                   <Button
                     variant={currentView === "settings" ? "default" : "ghost"}
                     className={cn(

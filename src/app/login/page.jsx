@@ -30,7 +30,6 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-
   const handleLogin = async (e) => {
     e.preventDefault();
     if (validateForm()) {
@@ -69,15 +68,27 @@ export default function Login() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ idToken, role: userData.role }),
           });
 
           if (!response.ok) {
             throw new Error("Failed to create session");
           }
 
-          // Now navigate to dashboard
-          router.push("/admin/dashboard");
+          // Redirect based on user role
+          switch (userData.role) {
+            case "admin":
+              router.push("/admin/dashboard");
+              break;
+            case "manager":
+              router.push("/manager/dashboard");
+              break;
+            case "cashier":
+              router.push("/cashier/dashboard");
+              break;
+            default:
+              router.push("/login");
+          }
 
           toast({
             title: "Success",
@@ -181,95 +192,90 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">
             Sign in to your account
-          </CardTitle>
+          </CardTitle>{" "}
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              onChange={(e) => handleInputChange("email", e.target.value)}
-              type="email"
-              placeholder="john@example.com"
-              required
-              className={`${
-                errors.email
-                  ? "border-red-500 focus:ring-red-500"
-                  : "border-gray-300"
-              }`}
-              disabled={isLoading}
-            />
-            {errors.email && (
-              <p className="text-sm text-red-500 mt-1">{errors.email}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
+          <form onSubmit={handleLogin}>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                onChange={(e) => handleInputChange("password", e.target.value)}
-                placeholder="••••••••"
+                id="email"
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                type="email"
+                placeholder="john@example.com"
                 required
                 className={`${
-                  errors.password
+                  errors.email
                     ? "border-red-500 focus:ring-red-500"
                     : "border-gray-300"
                 }`}
                 disabled={isLoading}
               />
-              {errors.password && (
-                <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              {errors.email && (
+                <p className="text-sm text-red-500 mt-1">{errors.email}</p>
               )}
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={isLoading}
-              >
-                {showPassword ? (
-                  <EyeOff
-                    className="h-5 w-5 text-gray-400"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                )}
-              </button>
             </div>
-          </div>
-          <div className="flex items-center justify-between">
-            {/* <div className="flex items-center space-x-2">
-              <Checkbox id="remember" disabled={isLoading} />
-              <Label
-                htmlFor="remember"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  onChange={(e) =>
+                    handleInputChange("password", e.target.value)
+                  }
+                  placeholder="••••••••"
+                  required
+                  className={`${
+                    errors.password
+                      ? "border-red-500 focus:ring-red-500"
+                      : "border-gray-300"
+                  }`}
+                  disabled={isLoading}
+                />
+                {errors.password && (
+                  <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+                )}
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? (
+                    <EyeOff
+                      className="h-5 w-5 text-gray-400"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-4">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
               >
-                Remember me
-              </Label>
-            </div> */}
-            <Link
-              href="/forgot-password"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                Forgot password?
+              </Link>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white mt-4"
+              disabled={isLoading}
             >
-              Forgot password?
-            </Link>
-          </div>
-          <Button
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-            onClick={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </Button>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <div className="relative">

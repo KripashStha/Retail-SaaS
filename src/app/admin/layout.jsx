@@ -1,4 +1,4 @@
-import { ClientSidebar } from "@/components/client-sidebar";
+import { AdminSidebar } from "@/components/admin-sidebar";
 import { PageTitle } from "@/components/page-title";
 import { requireAuth, getBusinessData } from "@/lib/server-auth";
 
@@ -12,9 +12,12 @@ export default async function AdminLayout({ children }) {
   // Get business data on the server
   const businessData = await getBusinessData(userId);
 
+  // role = getCurrentUserRole(userId);
+  // if (role !== "admin") redirect("/unauthorized");
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <ClientSidebar businessName={businessData} />
+      <AdminSidebar businessName={businessData} />
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto min-w-0 flex flex-col relative">

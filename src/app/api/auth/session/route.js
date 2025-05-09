@@ -2,10 +2,13 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getFirebaseAdminApp } from '@/lib/server-auth';
 
 // Initialize Firebase Admin
-const adminAuth = getAuth(getFirebaseAdminApp());
+const adminApp = getFirebaseAdminApp();
+const adminAuth = getAuth(adminApp);
+const adminDb = getFirestore(adminApp);
 
 // Max age for the session cookie in seconds (14 days)
 const SESSION_EXPIRES_IN = 60 * 60 * 24 * 14;
@@ -20,17 +23,28 @@ export async function POST(request) {
     
     // Verify the ID token and create a session cookie
     const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const uid = decodedToken.uid;
     
     // Create a session cookie
     const sessionCookie = await adminAuth.createSessionCookie(idToken, {
       expiresIn: SESSION_EXPIRES_IN * 1000, // Convert to milliseconds
     });
     
+    // Fetch user's role from Firestore using admin SDK
+    const userDoc = await adminDb.collection("Users").doc(uid).get();
+    
+    if (!userDoc.exists) {
+      console.error('User document does not exist');
+      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+    }
+    
+    const userData = userDoc.data();
+    const userRole = userData.role || 'cashier'; // Default to 'user' if role is not defined
+    
     // Set the session cookie in the response
-    const cookieStore = await cookies();
+    const cookieStore = cookies();
     
     // Get the protocol and host from the request
-    const url = request.url || '';
     const isProduction = process.env.NODE_ENV === 'production';
     
     cookieStore.set('session', sessionCookie, {
@@ -38,20 +52,28 @@ export async function POST(request) {
       httpOnly: true,
       secure: isProduction,
       path: '/',
-      sameSite: 'lax', // Use 'none' if your frontend and API are on different domains
-      // Don't set domain to let the browser set it automatically based on the current domain
+      sameSite: 'lax',
     });
     
-    console.log('Cookie set successfully in', isProduction ? 'production' : 'development');
+    // Set the user role cookie
+    cookieStore.set('user_role', userRole, {
+      maxAge: SESSION_EXPIRES_IN,
+      httpOnly: true,
+      secure: isProduction,
+      path: '/',
+      sameSite: 'lax',
+    });
+    
+    console.log('Cookies set successfully in', isProduction ? 'production' : 'development');
     
     return NextResponse.json(
-      { success: true },
+      { success: true, role: userRole },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error creating session:', error.message);
+    console.error('Error creating session:', error);
     return NextResponse.json(
-      { error: 'Failed to create session: ' + error.message },
+      { error: 'Failed to create session: ' + (error.message || 'Unknown error') },
       { status: 401 }
     );
   }

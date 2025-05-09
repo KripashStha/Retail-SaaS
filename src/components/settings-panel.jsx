@@ -49,7 +49,7 @@ export function SettingsPanel() {
   // Store settings
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [taxRate, setTaxRate] = useState(0.1);
+  const [taxRate, setTaxRate] = useState(10);
 
   // Account settings
   const [email, setEmail] = useState("");

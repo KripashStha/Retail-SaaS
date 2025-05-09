@@ -142,3 +142,65 @@ export async function requireAuth() {
   
   return session.uid;
 }
+
+// New functions for role-based authentication
+
+export async function getUserRole(userId) {
+  if (!userId) return null;
+  
+  try {
+    const userRef = adminDb.collection('Users').doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      return null;
+    }
+    
+    const userData = userDoc.data();
+    return userData.role || null;
+  } catch (error) {
+    console.error('Error fetching user role:', error);
+    return null;
+  }
+}
+
+export async function requireRole(allowedRoles) {
+  const session = await getServerSession();
+  
+  if (!session) {
+    redirect('/login');
+  }
+  
+  const userId = session.uid;
+  const userRole = await getUserRole(userId);
+  
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    // Redirect to appropriate dashboard based on role
+    if (userRole === 'admin') {
+      redirect('/admin/dashboard');
+    } else if (userRole === 'manager') {
+      redirect('/manager/dashboard');
+    } else if (userRole === 'cashier') {
+      redirect('/cashier/summary');
+    } else {
+      // If no valid role, redirect to login
+      redirect('/login');
+    }
+  }
+  
+  return { userId, userRole };
+}
+
+// Helper function to get the dashboard path for a user's role
+export function getRoleDashboard(role) {
+  switch (role) {
+    case 'admin':
+      return '/admin/dashboard';
+    case 'manager':
+      return '/manager/dashboard';
+    case 'cashier':
+      return '/cashier/summary';
+    default:
+      return '/login';
+  }
+}

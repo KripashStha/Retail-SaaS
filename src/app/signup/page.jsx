@@ -32,7 +32,6 @@ export default function SignUp() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
   const handleSignUp = async (e) => {
     e.preventDefault();
     if (validateForm()) {
@@ -121,122 +120,124 @@ export default function SignUp() {
           </div>
           <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">
             Create your account
-          </CardTitle>
+          </CardTitle>{" "}
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="company-name">Company Name</Label>
-            <Input
-              id="company-name"
-              placeholder="Your company name"
-              onChange={(e) => setCompany(e.target.value)}
-              required
-              className={`${
-                errors.company ? "border-red-500" : "border-gray-300"
-              }`}
-              disabled={isLoading}
-            />
-            {errors.company && (
-              <p className="text-sm text-red-500">{errors.company}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="full-name">Full Name</Label>
-            <Input
-              id="full-name"
-              placeholder="John Doe"
-              onChange={(e) => setName(e.target.value)}
-              required
-              className={`${
-                errors.name ? "border-red-500" : "border-gray-300"
-              }`}
-              disabled={isLoading}
-            />
-            {errors.name && (
-              <p className="text-sm text-red-500">{errors.name}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="john@example.com"
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className={`${
-                errors.email ? "border-red-500" : "border-gray-300"
-              }`}
-              disabled={isLoading}
-            />
-            {errors.email && (
-              <p className="text-sm text-red-500">{errors.email}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
+          <form onSubmit={handleSignUp}>
+            <div className="space-y-2">
+              <Label htmlFor="company-name">Company Name</Label>
               <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
+                id="company-name"
+                placeholder="Your company name"
+                onChange={(e) => setCompany(e.target.value)}
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 className={`${
-                  errors.password ? "border-red-500" : "border-gray-300"
+                  errors.company ? "border-red-500" : "border-gray-300"
                 }`}
                 disabled={isLoading}
               />
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password}</p>
+              {errors.company && (
+                <p className="text-sm text-red-500">{errors.company}</p>
               )}
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
+            </div>
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="full-name">Full Name</Label>
+              <Input
+                id="full-name"
+                placeholder="John Doe"
+                onChange={(e) => setName(e.target.value)}
+                required
+                className={`${
+                  errors.name ? "border-red-500" : "border-gray-300"
+                }`}
                 disabled={isLoading}
-              >
-                {showPassword ? (
-                  <EyeOff
-                    className="h-5 w-5 text-gray-400"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                )}
-              </button>
+              />
+              {errors.name && (
+                <p className="text-sm text-red-500">{errors.name}</p>
+              )}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Password Strength</Label>
-            <div className="flex space-x-1">
-              {[1, 2, 3, 4, 5].map((level) => (
-                <div
-                  key={level}
-                  className={`h-1 w-full rounded-full ${
-                    passwordStrength(password) >= level
-                      ? "bg-indigo-600 dark:bg-indigo-400"
-                      : "bg-gray-200 dark:bg-gray-700"
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={`${
+                  errors.email ? "border-red-500" : "border-gray-300"
+                }`}
+                disabled={isLoading}
+              />
+              {errors.email && (
+                <p className="text-sm text-red-500">{errors.email}</p>
+              )}
+            </div>
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${
+                    errors.password ? "border-red-500" : "border-gray-300"
                   }`}
+                  disabled={isLoading}
                 />
-              ))}
+                {errors.password && (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                )}
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? (
+                    <EyeOff
+                      className="h-5 w-5 text-gray-400"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
-          <Button
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-            onClick={handleSignUp}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Account...
-              </>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
+            <div className="space-y-2 mt-4">
+              <Label>Password Strength</Label>
+              <div className="flex space-x-1">
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <div
+                    key={level}
+                    className={`h-1 w-full rounded-full ${
+                      passwordStrength(password) >= level
+                        ? "bg-indigo-600 dark:bg-indigo-400"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white mt-4"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+          </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <div className="relative">

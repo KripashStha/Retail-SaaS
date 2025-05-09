@@ -113,7 +113,7 @@ export function InventoryProvider({ children }) {
 
     let unsubscribeProducts = null;
     let retryCount = 0;
-    const MAX_RETRIES = 10;
+    const MAX_RETRIES = 15; // Maximum number of retries for fetching user data
     const RETRY_DELAY = 1500; // 1.5 seconds between retries
 
     const fetchBusinessData = async () => {

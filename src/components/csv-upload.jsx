@@ -90,7 +90,6 @@ export function CsvUpload() {
 
   // All possible fields
   const allFields = [
-    "id",
     "name",
     "category",
     "price",
@@ -509,15 +508,6 @@ export function CsvUpload() {
                 </Button>
               )}
             </div>
-            {/* <div className="flex justify-between text-sm text-muted-foreground">
-              <p>
-                File must be in CSV format with headers. Required fields: name,
-                price, quantity, category.
-              </p>
-              <Button variant="link" size="sm" className="h-auto p-0" onClick={downloadTemplate}>
-                Download Template
-              </Button>
-            </div> */}
           </div>
 
           {/* File Info */}
@@ -653,7 +643,6 @@ export function CsvUpload() {
               </TableHeader>
               <TableBody>
                 <TableRow>
-                  <TableCell>Leave empty for new products</TableCell>
                   <TableCell>Product Name</TableCell>
                   <TableCell>Category name</TableCell>
                   <TableCell>19.99</TableCell>

@@ -464,16 +464,18 @@ export function SalesHistoryRefunds() {
       const matchingSales = [];
 
       querySnapshot.forEach((doc) => {
-        // Check if receipt ID contains the search string
-        const saleData = doc.data();
-        matchingSales.push({
-          id: doc.id,
-          ...saleData,
-          timestamp:
-            saleData.timestamp instanceof Timestamp
-              ? saleData.timestamp.toDate()
-              : new Date(saleData.timestamp) || new Date(),
-        });
+        // Only add documents that include the receipt number in their ID
+        if (doc.id.toLowerCase().includes(receiptNumber.toLowerCase())) {
+          const saleData = doc.data();
+          matchingSales.push({
+            id: doc.id,
+            ...saleData,
+            timestamp:
+              saleData.timestamp instanceof Timestamp
+                ? saleData.timestamp.toDate()
+                : new Date(saleData.timestamp) || new Date(),
+          });
+        }
       });
 
       if (matchingSales.length === 1) {
@@ -503,7 +505,6 @@ export function SalesHistoryRefunds() {
       toast({
         title: "Search Failed",
         description: "Failed to search for receipt. Please try again.",
-        variant: "destructive",
       });
     } finally {
       setIsSearchingReceipt(false);
@@ -773,10 +774,10 @@ export function SalesHistoryRefunds() {
                 </Button>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-amber-800 flex items-start">
-                <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="rounded-md p-4 text-muted-foreground flex items-start">
+                <Info className="h-4 w-4 mr-2 flex-shrink-0 mt-1.5" />
                 <div className="text-sm">
-                  <p className="font-medium">Instructions:</p>
+                  <p className="font-medium ">Instructions:</p>
                   <p>1. Enter the receipt number from the customer's receipt</p>
                   <p>
                     2. Select the items being returned and specify quantities
