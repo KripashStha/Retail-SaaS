@@ -3,19 +3,12 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function POST(request) {  try {
+export async function POST(request) {
+  try {
     const body = await request.json();
     const { email, role, token } = body;
  
-    // Ensure the URL is properly formatted with protocol
-    let baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://easyinventory.tech';
-    // Add https:// if not already present
-    if (!baseUrl.startsWith('http')) {
-      baseUrl = `https://${baseUrl}`;
-    }
-    const inviteUrl = `${baseUrl}/invite/accept?token=${token}`;
-    
-    console.log(`Generated invitation URL: ${inviteUrl}`);
+    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/accept?token=${token}`;
 
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_USER,
