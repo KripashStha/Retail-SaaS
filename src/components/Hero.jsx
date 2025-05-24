@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, BarChart2, Package, ShoppingCart } from "lucide-react";
+import { ArrowRight} from "lucide-react";
 import { useTheme } from "next-themes";
 
 export default function Hero() {

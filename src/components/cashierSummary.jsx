@@ -284,7 +284,7 @@ export function CashierSummary() {
                 <thead>
                   <tr className="text-left border-b">
                     <th className="pb-2">Time</th>
-                    <th className="pb-2">Order ID</th>
+                    <th className="pb-2">Transaction ID</th>
                     <th className="pb-2">Amount</th>
                     <th className="pb-2">Items</th>
                   </tr>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { db } from "@/firebase/dbConfig";
 import { useToast } from "@/hooks/use-toast";
+import { navigateByRole } from "@/utils/auth-utils";
 
 function GoogleOauth() {
   const router = useRouter();
@@ -28,9 +29,7 @@ function GoogleOauth() {
       const user = result.user;
 
       // Get ID token for session creation
-      const idToken = await user.getIdToken();
-
-      // Create server-side session
+      const idToken = await user.getIdToken();      // Create server-side session
       try {
         const sessionResponse = await fetch("/api/auth/session", {
           method: "POST",
@@ -38,29 +37,58 @@ function GoogleOauth() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ idToken }),
+          credentials: 'include' // Important to include cookies
         });
 
         if (!sessionResponse.ok) {
-          throw new Error("Failed to create session");
+          throw new Error(`Failed to create session: ${sessionResponse.status}`);
         }
+        
+        // Parse the session response
+        const sessionData = await sessionResponse.json();
+        console.log("Session created successfully:", sessionData);
+        
+        if (sessionData.error) {
+          throw new Error(sessionData.error);
+        }
+        
+        // Store auth status in localStorage to help with session management
+        localStorage.setItem('auth_status', 'authenticated');
+        
+        // Redirect based on whether user is new or has a role
+        if (sessionData.isNewUser) {
+          console.log("New user detected, redirecting to business setup");
+          toast({
+            title: "Welcome!",
+            description: "Let's set up your business profile",
+            duration: 3000
+          });
+          
+          // Use window.location for a full page navigation to ensure cookies are applied
+          window.location.href = "/business-setup";
+        } else {
+          console.log("Existing user detected with role:", sessionData.role);
+          toast({
+            title: "Login Successful!",
+            description: "Redirecting to your dashboard...",
+            duration: 2000
+          });
+          
+          // Navigate to the appropriate dashboard based on user role
+          const redirectPath = navigateByRole(sessionData.role);
+          window.location.href = redirectPath;
+        }
+        
+        return; // Return early to prevent additional navigation
       } catch (sessionError) {
         console.error("Failed to create session:", sessionError);
         toast({
           variant: "destructive",
           title: "Authentication Error",
-          description: "Failed to create session. Please try again.",
+          description: sessionError.message || "Failed to create session. Please try again.",
         });
         setIsLoading(false);
         return;
-      }
-
-      // Check if user exists in Firestore
-      const userDoc = await getDoc(doc(db, "Users", user.uid));
-
-      if (!userDoc.exists()) {
-        router.push("/business-setup");
-      } else {
-        router.push("/admin/dashboard");
       }
     } catch (error) {
       console.error("Error signing in with Google:", error);

@@ -188,9 +188,7 @@ export default function SignUp() {
                   }`}
                   disabled={isLoading}
                 />
-                {errors.password && (
-                  <p className="text-sm text-red-500">{errors.password}</p>
-                )}
+                
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -207,6 +205,9 @@ export default function SignUp() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                )}
             </div>
             <div className="space-y-2 mt-4">
               <Label>Password Strength</Label>

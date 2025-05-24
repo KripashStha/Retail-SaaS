@@ -153,8 +153,8 @@ export default function Login() {
 
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
     }
 
     setErrors(newErrors);
@@ -214,7 +214,7 @@ export default function Login() {
               {errors.email && (
                 <p className="text-sm text-red-500 mt-1">{errors.email}</p>
               )}
-            </div>
+            </div>{" "}
             <div className="space-y-2 mt-4">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -233,9 +233,6 @@ export default function Login() {
                   }`}
                   disabled={isLoading}
                 />
-                {errors.password && (
-                  <p className="text-sm text-red-500 mt-1">{errors.password}</p>
-                )}
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -252,6 +249,9 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="text-sm text-red-500 mt-1">{errors.password}</p>
+              )}
             </div>
             <div className="flex items-center justify-between mt-4">
               <Link

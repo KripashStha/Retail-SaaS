@@ -1,14 +1,14 @@
 import { CashierSidebar } from "@/components/cashier-sidebar";
 import { PageTitle } from "@/components/page-title";
-import { requireAuth, getBusinessData } from "@/lib/server-auth";
+import { requireRole, getBusinessData } from "@/lib/server-auth";
 import SidebarToggle from "@/components/sidebar-toggle";
 
 // Force dynamic rendering for this layout and all its child routes
 export const dynamic = "force-dynamic";
 
-export default async function AdminLayout({ children }) {
-  // Handle authentication on the server
-  const userId = await requireAuth();
+export default async function CashierLayout({ children }) {
+  // Handle authentication and role authorization on the server
+  const { userId, userRole } = await requireRole(["cashier"]);
 
   // Get business data on the server
   const businessData = await getBusinessData(userId);

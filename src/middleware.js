@@ -16,8 +16,7 @@ const PROTECTED_ROUTES = {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  
-  // Allow public routes and API routes to pass through
+    // Allow public routes and API routes to pass through
   if (
     pathname.startsWith('/_next') || 
     pathname.startsWith('/api') || 
@@ -25,11 +24,11 @@ export async function middleware(request) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') || 
     pathname.startsWith('/forgot-password') ||
-    pathname.startsWith('/invite/accept')
+    pathname.startsWith('/invite/accept') ||
+    pathname.startsWith('/business-setup')
   ) {
     return NextResponse.next();
   }
-
   // Check for session cookie
   const sessionCookie = request.cookies.get('session')?.value;
   
@@ -40,13 +39,32 @@ export async function middleware(request) {
     return NextResponse.redirect(url);
   }
   
-  // Check for the "role" cookie that we'll set on login
-  const roleCookie = request.cookies.get('user_role')?.value;
+  // Check for role cookies - try both the httpOnly and client-side versions
+  const roleCookie = request.cookies.get('user_role')?.value || request.cookies.get('client_role')?.value;
+  
+  // Log current state for debugging
+  console.log(`Middleware path: ${pathname}, roleCookie: ${roleCookie || 'none'}`);
+  
+  // Special case for business-setup path
+  if (pathname.startsWith('/business-setup')) {
+    if (roleCookie) {
+      // If user already has a role, redirect them to their dashboard
+      const redirectPath = ROLE_REDIRECT_PATHS[roleCookie] || '/admin/dashboard';
+      console.log(`User has role ${roleCookie}, redirecting from business-setup to ${redirectPath}`);
+      const redirectUrl = new URL(redirectPath, request.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+    // If no role cookie, allow access to business setup
+    console.log('No role found, allowing access to business-setup');
+    return NextResponse.next();
+  }
   
   if (!roleCookie) {
-    // If no role cookie but has session, redirect to login to refresh role
-    const url = new URL('/login', request.url);
-    return NextResponse.redirect(url);
+    // If no role cookie but has session, redirect to business setup if path requires role
+    if (pathname !== '/business-setup') {
+      console.log('No role found, redirecting to business-setup');
+      return NextResponse.redirect(new URL('/business-setup', request.url));
+    }
   }
 
   // Handle redirects for root role paths (e.g., /admin, /manager, /cashier)

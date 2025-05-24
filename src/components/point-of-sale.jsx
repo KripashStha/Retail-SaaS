@@ -539,7 +539,7 @@ export function PointOfSale() {
             
             <div class="footer">
               <p>Thank you for your purchase!</p>
-              <p>Payment Method: ${saleData.paymentMethod}</p>
+              <p>Visit us again!</p>
             </div>
           </div>
           
@@ -830,8 +830,15 @@ export function PointOfSale() {
 
       {/* Right side - Cart */}
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Shopping Cart</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            Shopping Cart
+            {cart.length > 0 && (
+              <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full bg-primary text-primary-foreground">
+                {cart.reduce((total, item) => total + item.quantity, 0)}
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -841,42 +848,94 @@ export function PointOfSale() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Item</TableHead>
+                        <TableHead className="w-[40%]">Item</TableHead>
                         <TableHead>Qty</TableHead>
                         <TableHead>Price</TableHead>
-                        <TableHead>Action</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cart.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                updateQuantity(
-                                  item.id,
-                                  parseInt(e.target.value)
-                                )
-                              }
-                              className="w-20"
-                              min="1"
-                            />
+                          <TableCell className="font-medium">
+                            {item.name}
                           </TableCell>
                           <TableCell>
-                            <CurrencyFormatter
-                              value={item.price * item.quantity}
-                            />
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() =>
+                                  updateQuantity(
+                                    item.id,
+                                    Math.max(1, item.quantity - 1)
+                                  )
+                                }
+                              >
+                                <span className="sr-only">Decrease</span>
+                                <span>-</span>
+                              </Button>
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  updateQuantity(
+                                    item.id,
+                                    parseInt(e.target.value) || 1
+                                  )
+                                }
+                                className="w-14 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                min="1"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  // Find current product to check stock
+                                  const product = products.find(
+                                    (p) => p.id === item.id
+                                  );
+                                  if (
+                                    !product ||
+                                    item.quantity < product.quantity
+                                  ) {
+                                    updateQuantity(item.id, item.quantity + 1);
+                                  } else {
+                                    toast({
+                                      title: "Stock Limit",
+                                      description: `Only ${product.quantity} units available`,
+                                    });
+                                  }
+                                }}
+                              >
+                                <span className="sr-only">Increase</span>
+                                <span>+</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm text-muted-foreground">
+                                <CurrencyFormatter value={item.price} /> each
+                              </span>
+                              <span className="font-medium">
+                                <CurrencyFormatter
+                                  value={item.price * item.quantity}
+                                />
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => removeFromCart(item.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
                             >
                               <X className="h-4 w-4" />
+                              <span className="sr-only">Remove</span>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -886,51 +945,50 @@ export function PointOfSale() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <ShoppingCart className="h-12 w-12 mb-2" />
-                <p>Your cart is empty</p>
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                <ShoppingCart className="h-12 w-12 mb-2 opacity-30" />
+                <p className="font-medium mb-1">Your cart is empty</p>
+                <p className="text-sm text-center max-w-[250px]">
+                  Search for products or scan barcodes to add items to your cart
+                </p>
               </div>
             )}
 
             {/* Discount Section */}
             {cart.length > 0 && (
               <div className="pt-4 border-t">
-                <Label htmlFor="discount-type">Apply Discount</Label>
-                <div className="flex flex-col sm:flex-row gap-2 mt-1">
-                  <Select value={discountType} onValueChange={setDiscountType}>
-                    <SelectTrigger
-                      id="discount-type"
-                      className="w-full sm:w-[150px]"
+                <div className="flex flex-col gap-3">
+                  <Label htmlFor="discount-type" className="font-medium">
+                    Apply Discount
+                  </Label>
+                  <div className="flex flex-col sm:flex-row items-center gap-2 mt-1">
+                    <Select
+                      value={discountType}
+                      onValueChange={setDiscountType}
                     >
-                      <SelectValue placeholder="Discount Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Discount</SelectItem>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">
-                        Fixed Amount ({getCurrencySymbol()})
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger
+                        id="discount-type"
+                        className="w-full sm:w-[180px]"
+                      >
+                        <SelectValue placeholder="Select discount type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Discount</SelectItem>
+                        <SelectItem value="percentage">
+                          Percentage (%)
+                        </SelectItem>
+                        <SelectItem value="fixed">
+                          Fixed Amount ({getCurrencySymbol()})
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  {discountType !== "none" && (
-                    <Input
-                      type="number"
-                      min="0"
-                      max={
-                        discountType === "percentage"
-                          ? 100
-                          : convertCurrency(
-                              calculateTotals.subtotal,
-                              "USD",
-                              currency
-                            ).toFixed(2)
-                      }
-                      value={discountValue}
-                      onChange={(e) =>
-                        setDiscountValue(
-                          Math.min(
-                            parseFloat(e.target.value) || 0,
+                    {discountType !== "none" && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Input
+                          type="number"
+                          min="0"
+                          max={
                             discountType === "percentage"
                               ? 100
                               : convertCurrency(
@@ -938,57 +996,112 @@ export function PointOfSale() {
                                   "USD",
                                   currency
                                 ).toFixed(2)
-                          )
-                        )
-                      }
-                      className="w-full sm:w-24"
-                      placeholder={
-                        discountType === "percentage"
-                          ? "%"
-                          : `${getCurrencySymbol()}`
-                      }
-                    />
-                  )}
+                          }
+                          value={discountValue}
+                          onChange={(e) =>
+                            setDiscountValue(
+                              Math.min(
+                                parseFloat(e.target.value) || 0,
+                                discountType === "percentage"
+                                  ? 100
+                                  : convertCurrency(
+                                      calculateTotals.subtotal,
+                                      "USD",
+                                      currency
+                                    ).toFixed(2)
+                              )
+                            )
+                          }
+                          className="w-24"
+                          placeholder={
+                            discountType === "percentage"
+                              ? "%"
+                              : `${getCurrencySymbol()}`
+                          }
+                        />
+                        {discountType === "percentage" && (
+                          <span className="text-sm text-muted-foreground">
+                            (Saves{" "}
+                            <CurrencyFormatter
+                              value={calculateTotals.discount}
+                            />
+                            )
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col items-end gap-4">
-          <div className="text-right mt-4 w-full">
-            <p>
-              Subtotal: <CurrencyFormatter value={calculateTotals.subtotal} />
-            </p>
-            {calculateTotals.discount > 0 && (
-              <p>
-                Discount: -
-                <CurrencyFormatter value={calculateTotals.discount} />
-              </p>
-            )}
-            <p>
-              Tax: <CurrencyFormatter value={calculateTotals.tax} />
-            </p>
-            <p className="text-lg font-bold">
-              Total: <CurrencyFormatter value={calculateTotals.total} />
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full">
-            <Button
-              variant="outline"
-              onClick={() => setCart([])}
-              disabled={cart.length === 0}
-              className="w-full sm:w-auto"
-            >
-              Clear Cart
-            </Button>
-            <Button
-              onClick={processSale}
-              disabled={cart.length === 0 || isProcessing}
-              className="w-full sm:w-auto"
-            >
-              {isProcessing ? "Processing..." : "Process Sale"}
-            </Button>
-          </div>
+        <CardFooter className="flex flex-col gap-4 border-t pt-4">
+          {cart.length > 0 && (
+            <div className="w-full">
+              <div className="space-y-1.5 mb-4">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span>
+                    <CurrencyFormatter value={calculateTotals.subtotal} />
+                  </span>
+                </div>
+
+                {calculateTotals.discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount:</span>
+                    <span>
+                      -<CurrencyFormatter value={calculateTotals.discount} />
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Tax ({taxRate}%):
+                  </span>
+                  <span>
+                    <CurrencyFormatter value={calculateTotals.tax} />
+                  </span>
+                </div>
+
+                <div className="flex justify-between text-lg font-bold pt-2 border-t mt-2">
+                  <span>Total:</span>
+                  <span>
+                    <CurrencyFormatter value={calculateTotals.total} />
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => setCart([])}
+                  disabled={cart.length === 0}
+                  className="w-full sm:w-auto"
+                >
+                  Clear Cart
+                </Button>
+                <Button
+                  onClick={processSale}
+                  disabled={cart.length === 0 || isProcessing}
+                  className="w-full sm:flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  {isProcessing ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                      Processing...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Printer className="h-4 w-4" />
+                      Process Sale
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardFooter>
       </Card>
     </div>

@@ -27,13 +27,15 @@ export const getFirebaseAdminApp = () => {
     clientEmail,
     privateKey,
   };
-
   try {
     // Check if any of the required config values are missing
     if (!FIREBASE_ADMIN_CONFIG.projectId || 
         !FIREBASE_ADMIN_CONFIG.clientEmail || 
         !FIREBASE_ADMIN_CONFIG.privateKey) {
       console.error('Missing Firebase Admin configuration. Check your environment variables.');
+      console.error('Project ID:', FIREBASE_ADMIN_CONFIG.projectId ? 'Available' : 'Missing');
+      console.error('Client Email:', FIREBASE_ADMIN_CONFIG.clientEmail ? 'Available' : 'Missing');
+      console.error('Private Key:', FIREBASE_ADMIN_CONFIG.privateKey ? 'Available' : 'Missing (or formatting issue)');
       throw new Error('Missing Firebase Admin configuration');
     }
     
@@ -173,15 +175,14 @@ export async function requireRole(allowedRoles) {
   
   const userId = session.uid;
   const userRole = await getUserRole(userId);
-  
-  if (!userRole || !allowedRoles.includes(userRole)) {
+    if (!userRole || !allowedRoles.includes(userRole)) {
     // Redirect to appropriate dashboard based on role
     if (userRole === 'admin') {
       redirect('/admin/dashboard');
     } else if (userRole === 'manager') {
       redirect('/manager/dashboard');
     } else if (userRole === 'cashier') {
-      redirect('/cashier/summary');
+      redirect('/cashier/dashboard');
     } else {
       // If no valid role, redirect to login
       redirect('/login');
@@ -199,7 +200,7 @@ export function getRoleDashboard(role) {
     case 'manager':
       return '/manager/dashboard';
     case 'cashier':
-      return '/cashier/summary';
+      return '/cashier/dashboard';
     default:
       return '/login';
   }

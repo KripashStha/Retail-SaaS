@@ -52,6 +52,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
+  XCircle,
 } from "lucide-react";
 import { auth, db } from "@/firebase/dbConfig";
 import {
@@ -367,14 +368,13 @@ export function SalesHistoryRefunds() {
       const saleData = saleDoc.data();
 
       // Create or update the refundedItems array to track which items have been refunded
-      const existingRefundedItems = saleData.refundedItems || [];
-
-      // Build new refundedItems entry that tracks which items were refunded in this transaction
+      const existingRefundedItems = saleData.refundedItems || []; // Build new refundedItems entry that tracks which items were refunded in this transaction
       const newRefundedItems = selectedItems.map((item) => ({
         id: item.id,
         name: item.name,
         quantity: item.refundQuantity,
         refundId: refundRef.id,
+        reason: refundReason || "No reason provided",
         timestamp: new Date().toISOString(), // Use ISO string instead of serverTimestamp
       }));
 
@@ -792,7 +792,6 @@ export function SalesHistoryRefunds() {
           </Card>
         </TabsContent>
       </Tabs>
-
       {/* Refund Dialog */}
       <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
@@ -922,8 +921,7 @@ export function SalesHistoryRefunds() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-
+      </Dialog>{" "}
       {/* Receipt Dialog */}
       <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
         <DialogContent>
@@ -946,11 +944,10 @@ export function SalesHistoryRefunds() {
                   <span>{selectedTransaction.cashierEmail}</span>
                 </div>
                 <Separator />
-              </div>
-
+              </div>{" "}
               <div className="space-y-2">
                 <h4 className="font-medium">Items</h4>
-                <ScrollArea className="h-[200px]">
+                <div className="h-[200px] overflow-y-auto border rounded-md p-2">
                   {selectedTransaction.items.map((item, i) => (
                     <div
                       key={i}
@@ -964,10 +961,9 @@ export function SalesHistoryRefunds() {
                       </span>
                     </div>
                   ))}
-                </ScrollArea>
+                </div>
                 <Separator />
               </div>
-
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
@@ -989,7 +985,7 @@ export function SalesHistoryRefunds() {
                   <span>
                     <CurrencyFormatter value={selectedTransaction.tax} />
                   </span>
-                </div>
+                </div>{" "}
                 <div className="flex justify-between font-bold">
                   <span>Total:</span>
                   <span>
@@ -997,30 +993,129 @@ export function SalesHistoryRefunds() {
                   </span>
                 </div>
               </div>
-
               {selectedTransaction.refundedItems &&
               selectedTransaction.refundedItems.length > 0 ? (
-                <div className="bg-amber-50 p-3 rounded-md border border-amber-200 text-amber-800">
-                  <div className="flex items-start gap-2">
+                <div className="bg-amber-50 rounded-md border border-amber-200 text-amber-800">
+                  <div className="flex items-start gap-3 p-4 pb-2">
                     <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold">
-                        Some items from this transaction have been refunded
-                      </span>
-                      <ScrollArea className="mt-2 max-h-[100px]">
-                        {selectedTransaction.refundedItems.map((item, i) => (
-                          <div key={i} className="text-sm py-1">
-                            • {item.name}: {item.quantity}{" "}
-                            {item.quantity > 1 ? "units" : "unit"} refunded
-                          </div>
-                        ))}
-                      </ScrollArea>
+                    <div className="w-full">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-base">
+                          Refund History
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="bg-amber-100 border-amber-300 text-amber-800"
+                        >
+                          {selectedTransaction.refundedItems.length}{" "}
+                          {selectedTransaction.refundedItems.length === 1
+                            ? "item"
+                            : "items"}{" "}
+                          refunded
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
+                  </div>{" "}
+                  <ScrollArea className="h-[250px] w-full rounded-md">
+                    <div className="px-4 pb-4 pl-8 pr-2">
+                      {/* Group refunds by refundId to show reasons per refund transaction */}
+                      {(() => {
+                        // Group items by refund transaction
+                        const refundGroups =
+                          selectedTransaction.refundedItems.reduce(
+                            (acc, item) => {
+                              if (!acc[item.refundId]) {
+                                acc[item.refundId] = {
+                                  items: [],
+                                  reason: item.reason || "No reason provided",
+                                  timestamp: item.timestamp,
+                                  refundId: item.refundId,
+                                };
+                              }
+                              acc[item.refundId].items.push(item);
+                              return acc;
+                            },
+                            {}
+                          );
+
+                        // Convert to array and sort by timestamp (most recent first)
+                        return Object.values(refundGroups)
+                          .sort((a, b) => {
+                            const dateA = a.timestamp
+                              ? new Date(a.timestamp)
+                              : new Date(0);
+                            const dateB = b.timestamp
+                              ? new Date(b.timestamp)
+                              : new Date(0);
+                            return dateB - dateA; // Most recent first
+                          })
+                          .map((refund, groupIndex) => (
+                            <div
+                              key={refund.refundId}
+                              className="mb-4 pb-3 border-b border-amber-200 last:border-b-0 last:mb-0 last:pb-0"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <div className="text-xs bg-amber-200 text-amber-800 px-2 py-1 rounded-full font-medium">
+                                  Refund #{groupIndex + 1} •{" "}
+                                  {refund.timestamp
+                                    ? new Date(
+                                        refund.timestamp
+                                      ).toLocaleString()
+                                    : "Date unknown"}
+                                </div>
+                              </div>
+                              <div className="bg-white bg-opacity-50 rounded p-2 mb-2">
+                                <div className="text-sm font-medium mb-1.5">
+                                  Items Returned:
+                                </div>
+                                {refund.items.map((item, i) => (
+                                  <div
+                                    key={i}
+                                    className="text-sm py-0.5 flex justify-between items-center"
+                                  >
+                                    <span>• {item.name}</span>
+                                    <span className="font-medium">
+                                      {item.quantity}{" "}
+                                      {item.quantity > 1 ? "units" : "unit"}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="bg-amber-100 p-2 rounded">
+                                <div className="text-sm font-medium mb-1">
+                                  Reason for Refund:
+                                </div>
+                                <div className="text-sm">{refund.reason}</div>
+                              </div>{" "}
+                            </div>
+                          ));
+                      })()}
+                    </div>
+                  </ScrollArea>
                 </div>
               ) : null}
-
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  {selectedTransaction.refundedItems &&
+                  selectedTransaction.items.some((item) => {
+                    // Check if any items are still available for refund
+                    const refundedQuantity = (
+                      selectedTransaction.refundedItems || []
+                    )
+                      .filter((refund) => refund.id === item.id)
+                      .reduce((total, refund) => total + refund.quantity, 0);
+                    return refundedQuantity < item.quantity;
+                  }) ? (
+                    <span className="text-sm text-muted-foreground">
+                      Some items are still eligible for refund
+                    </span>
+                  ) : selectedTransaction.refundedItems ? (
+                    <span className="text-sm text-red-500 flex items-center">
+                      <XCircle className="h-4 w-4 mr-1" />
+                      All items have been fully refunded
+                    </span>
+                  ) : null}
+                </div>
                 <Button
                   onClick={() => {
                     setShowReceiptDialog(false);
